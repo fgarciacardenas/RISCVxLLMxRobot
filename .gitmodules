@@ -1,0 +1,8 @@
+[submodule "third_party/llama.cpp"]
+	path = third_party/llama.cpp
+	url = https://github.com/ggml-org/llama.cpp
+	branch = master
+[submodule "third_party/voyager-sdk"]
+	path = third_party/voyager-sdk
+	url = https://github.com/axelera-ai-hub/voyager-sdk
+	branch = release/v1.4
