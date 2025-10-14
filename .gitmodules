@@ -6,3 +6,11 @@
 	path = third_party/voyager-sdk
 	url = https://github.com/axelera-ai-hub/voyager-sdk
 	branch = release/v1.4
+[submodule "src/race_stack"]
+	path = src/race_stack
+	url = git@github.com:fgarciacardenas/race_stack.git
+	branch = main
+[submodule "src/LLMxRobot"]
+	path = src/LLMxRobot
+	url = git@github.com:fgarciacardenas/LLMxRobot.git
+	branch = main
