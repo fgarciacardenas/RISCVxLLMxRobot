@@ -46,7 +46,7 @@ For more information on how to run the different modules on the car, refer to th
 
 
 ## LLMxRobot installation
-1. Build the Docker container (adapt `CUDA_ARCH` accordingly: `86` for RTX 30xx, `89` for 40xx):
+1. Build the Docker container (adapt `CUDA_ARCH` accordingly: `86` for RTX 30xx, `89` for 40xx, `61` for 10xx):
 ```bash
 docker build --build-arg CUDA_ARCH=<your_compute_capability> -t embodiedai -f .docker_utils/Dockerfile.cuda .
 ```
@@ -130,3 +130,68 @@ git commit -m "Bump race_stack & LLMxRobot to latest rebased commits"
 - Unsloth models: https://docs.unsloth.ai/get-started/all-our-models#llama-models
 - Voyager LLM: https://github.com/axelera-ai-hub/voyager-sdk/blob/release/v1.4/docs/tutorials/llm.md
 - SFT models: https://huggingface.co/nibauman/models?p=0
+
+
+## How to use with singularity
+1. Build Docker image by following the steps detailed in the Forza repository: `https://github.com/ForzaETH/race_stack/tree/main`.
+
+2. Get Docker image name:
+```bash
+docker ps
+```
+
+Which outputs something like this, where the name is `vsc-race_stack-54de3ff3bbfca9751501dc118026c569343e10107f8c8150ba454185f6000277-uid`.
+```bash
+CONTAINER ID   IMAGE                                                                                 COMMAND                  CREATED        STATUS        PORTS     NAMES
+30feed8f30a4   vsc-race_stack-54de3ff3bbfca9751501dc118026c569343e10107f8c8150ba454185f6000277-uid   "/bin/sh -c 'echo Co…"   13 hours ago   Up 13 hours             forzaeth_devcontainer
+```
+
+3. Save Docker image as `.tar` file. For example:
+```bash
+docker save vsc-race_stack-54de3ff3bbfca9751501dc118026c569343e10107f8c8150ba454185f6000277-uid -o race-stack.tar
+```
+
+4. Stream to computer with rsync and place it in the `/scratch/$USER` folder. For example:
+```bash
+rsync -v sem25h27@finsteraarhorn.ee.ethz.ch:/home/sem25h27/race-stack.tar /scratch/sem25h27/
+```
+
+5. Build the image as sandbox using singularity:
+```bash
+singularity build --sandbox race-stack docker-archive://race-stack.tar
+```
+
+6. Create a ROS workspace to build the repository:
+```bash
+cd /scratch/sem25h27/catkin_ws/src
+git clone --recurse-submodules https://github.com/ForzaETH/race_stack.git
+```
+
+7. Run Singularity image with NVIDIA support:
+```bash
+cd /scratch/sem25h27
+singularity shell --nv race-stack
+```
+
+8. Inside the container, head to the catwin workspace:
+```bash
+source catkin_ws/devel/setup.bash
+```
+
+9. Run simulation inside Singularity container:
+```bash
+roslaunch stack_master base_system.launch sim:=true map_name:=test_map
+roslaunch stack_master time_trials.launch racecar_version:=NUC2
+```
+
+---
+
+For inference on the Axelera board:
+1. Follow the steps in: https://github.com/axelera-ai-hub/voyager-sdk/blob/release/v1.4/docs/tutorials/llm.md
+
+2. Call the infererance model:
+```bash
+cd /home/sem25h27/voyager-sdk
+source venv/bin/activate
+./inference_llm.py phi3-mini-512-static --prompt "Give me a joke"
+```
