@@ -186,12 +186,87 @@ roslaunch stack_master time_trials.launch racecar_version:=NUC2
 
 ---
 
-For inference on the Axelera board:
+# Inference on the Axelera board:
 1. Follow the steps in: https://github.com/axelera-ai-hub/voyager-sdk/blob/release/v1.4/docs/tutorials/llm.md
 
-2. Call the infererance model:
+2. Source the Axelera venv:
 ```bash
-cd /home/sem25h27/voyager-sdk
+cd ~/dev/RISCVxLLMxRobot/third_party/voyager-sdk
 source venv/bin/activate
-./inference_llm.py phi3-mini-512-static --prompt "Give me a joke"
+```
+
+3. Install LLMxRobot dependencies:
+```bash
+cd ~/dev/RISCVxLLMxRobot/src/LLMxRobot
+pip3 install --upgrade pip setuptools wheel
+pip3 install packaging
+pip3 install --upgrade --force-reinstall \
+    "torch==2.4.*" "torchvision==0.19.*" --index-url https://download.pytorch.org/whl/cpu
+pip3 install -r requirements_voyager.txt
+```
+
+4. Call the inference model:
+```bash
+python3 -m tests.decision_tester.decision_tester --dataset all --ax_local --local_workdir ~/dev/RISCVxLLMxRobot/third_party/voyager-sdk --local_venv ~/dev/RISCVxLLMxRobot/third_party/voyager-sdk/venv/bin/activate --local_run "python3 ~/dev/RISCVxLLMxRobot/third_party/voyager-sdk/inference_llm.py llama-3-2-3b-1024-4core-static"
+```
+
+# Usage with local RAG
+For online RAG, you can simply use:
+```bash
+python3 -m tests.decision_tester.decision_tester --model nibauman/RobotxLLM_Qwen7B_SFT --dataset all --rag
+```
+
+For offline RAG, you can either:
+```bash
+# Option A: build on the fly from prompts/RAG_memory.txt (same splitter/chunking)
+python3 -m tests.decision_tester.decision_tester --model nibauman/RobotxLLM_Qwen7B_SFT --dataset all --rag --rag_offline
+
+# Option B: use a prebuilt index
+python3 -m inference.rag_build_index --corpus_dir prompts --index_path data/rag_index/offline
+python3 -m tests.decision_tester.decision_tester --model nibauman/RobotxLLM_Qwen7B_SFT --dataset all --rag --rag_offline --rag_index data/rag_index/offline
+```
+
+
+# Export LLMxRobot docker image for Singularity
+1) Build the Docker image for 40-series:
+```bash
+# Clone
+git clone https://github.com/fgarciacardenas/LLMxRobot
+cd LLMxRobot
+
+# Build the CUDA image targeting 40xx (sm_89)
+docker build \
+  --build-arg CUDA_ARCH=89 \
+  -t llmxrobot:cuda89 \
+  -f .docker_utils/Dockerfile.cuda .
+```
+
+Notes:
+- You don’t need a GPU to build this; `nvcc` cross-compiles for the target SM.
+
+2) Export the Docker image to a tar file:
+```bash
+docker save -o llmxrobot-cuda89.tar llmxrobot:cuda89
+# (optional) gzip it before transfer
+gzip llmxrobot-cuda89.tar
+```
+
+3) On the server: build a Singularity/Apptainer .sif from the Docker archive:
+```bash
+# If you gzipped it, gunzip first
+gunzip llmxrobot-cuda89.tar.gz  # if applicable
+
+# Build the SIF from the Docker archive
+apptainer build llmxrobot-cuda89.sif docker-archive://llmxrobot-cuda89.tar
+```
+
+Notes:
+- The `docker-archive://` flow is the documented way to convert a saved Docker image to Apptainer/Singularity without pushing to a registry. 
+- If you prefer a registry, push `llmxrobot:cuda89` to Docker Hub/GHCR and do `apptainer build llmxrobot-cuda89.sif docker://user/repo:tag` on the server.
+
+4) Run with GPU access on the server
+Use `--nv` so Apptainer injects the host’s NVIDIA driver/libs into the container runtime.
+
+```bash
+apptainer exec --nv llmxrobot-cuda89.sif nvidia-smi
 ```
