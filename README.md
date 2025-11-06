@@ -129,6 +129,7 @@ git commit -m "Bump race_stack & LLMxRobot to latest rebased commits"
 ## Useful links
 - Unsloth models: https://docs.unsloth.ai/get-started/all-our-models#llama-models
 - Voyager LLM: https://github.com/axelera-ai-hub/voyager-sdk/blob/release/v1.4/docs/tutorials/llm.md
+- Voyager size: https://github.com/axelera-ai-hub/voyager-sdk/blob/release/v1.4/docs/reference/model_zoo.md
 - SFT models: https://huggingface.co/nibauman/models?p=0
 
 
