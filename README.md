@@ -264,6 +264,15 @@ apptainer build llmxrobot-cuda89.sif docker-archive://llmxrobot-cuda89.tar
 Notes:
 - The `docker-archive://` flow is the documented way to convert a saved Docker image to Apptainer/Singularity without pushing to a registry. 
 - If you prefer a registry, push `llmxrobot:cuda89` to Docker Hub/GHCR and do `apptainer build llmxrobot-cuda89.sif docker://user/repo:tag` on the server.
+- If the default build location does not work for you, update your environment to use the following variables (for example):
+```bash
+setenv APPTAINER_CACHEDIR /scratch/$USER/apptainer_cache
+setenv APPTAINER_TMPDIR /scratch/$USER/apptainer_tmp
+setenv SINGULARITY_CACHEDIR /scratch/$USER/apptainer_cache
+setenv SINGULARITY_TMPDIR /scratch/$USER/apptainer_tmp
+setenv HF_HOME /scratch/$USER/cache
+```
+
 
 4) Run with GPU access on the server
 Use `--nv` so Apptainer injects the host’s NVIDIA driver/libs into the container runtime.
