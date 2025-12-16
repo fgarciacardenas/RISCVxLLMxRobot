@@ -1,0 +1,36 @@
+\begin{sidewaystable}
+  \centering
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lcccccccc}
+    \toprule
+    \multicolumn{9}{c}{\cellcolor{ggufColor} \textbf{Accuracy metrics}} \\
+    \midrule
+    \makecell{\textbf{Model}\\\textbf{name}} &
+    \makecell{\textbf{Model}\\\textbf{Params}} &
+    \makecell{\textbf{RAG}\\\textbf{type}} &
+    \makecell{\textbf{Device}\\\textbf{used}} &
+    \makecell{\textbf{Quant}\\\textbf{scheme}} &
+    \makecell{\textbf{Binary}\\\textbf{output}} &
+    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
+    \makecell{\textbf{Accuracy}\\\textbf{(avg. | parsed)}} &
+    \makecell{\textbf{Output tokens}\\\textbf{(avg. | parsed)}} \\
+    \midrule
+    Phi3 & 3.80 B & \xmark & GGUF & Q4.M & \xmark & 100.00\% & \hphantom{}68.91 | 68.91\hphantom{}\% & \hphantom{0}54 | 54\hphantom{0} \\
+    Phi3 & 3.80 B & GPT-4o & GGUF & Q4.M & \xmark & 99.68\% & \hphantom{}69.48 | 69.66\hphantom{}\% & \hphantom{0}61 | 60\hphantom{0} \\
+    Phi3 & 3.80 B & BGE & GGUF & Q4.M & \xmark & 99.81\% & \hphantom{}71.95 | 72.06\hphantom{}\% & \hphantom{0}63 | 63\hphantom{0} \\
+    Phi3 & 3.80 B & \xmark & GGUF & Q4.M & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{0}22 | 0\hphantom{00} \\
+    Phi3 & 3.80 B & GPT-4o & GGUF & Q4.M & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}148 | 0\hphantom{00} \\
+    Phi3 & 3.80 B & BGE & GGUF & Q4.M & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}109 | 0\hphantom{00} \\
+    \midrule
+    Phi3 & 3.80 B & \xmark & GGUF & Q5.M & \xmark & 100.00\% & \hphantom{}73.03 | 73.03\hphantom{}\% & \hphantom{}133 | 133\hphantom{} \\
+    Phi3 & 3.80 B & GPT-4o & GGUF & Q5.M & \xmark & 100.00\% & \hphantom{}79.82 | 79.82\hphantom{}\% & \hphantom{}185 | 185\hphantom{} \\
+    Phi3 & 3.80 B & BGE & GGUF & Q5.M & \xmark & 100.00\% & \hphantom{}81.73 | 81.73\hphantom{}\% & \hphantom{}174 | 174\hphantom{} \\
+    Phi3 & 3.80 B & \xmark & GGUF & Q5.M & \cmark & 100.00\% & \hphantom{}80.52 | 80.52\hphantom{}\% & \hphantom{00}9 | 9\hphantom{00} \\
+    Phi3 & 3.80 B & GPT-4o & GGUF & Q5.M & \cmark & 91.05\% & \hphantom{}71.32 | 76.43\hphantom{}\% & \hphantom{0}29 | 9\hphantom{00} \\
+    Phi3 & 3.80 B & BGE & GGUF & Q5.M & \cmark & 91.50\% & \hphantom{}76.65 | 84.48\hphantom{}\% & \hphantom{0}28 | 9\hphantom{00} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Comparison of Phi3 GGUF models with different quantization approaches.}
+  \label{tab:phi-gguf}
+\end{sidewaystable}
