@@ -1,0 +1,37 @@
+\begin{sidewaystable}
+  \centering
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lcccccccc}
+    \toprule
+    \multicolumn{9}{c}{\cellcolor{ggufColor} \textbf{Accuracy metrics}} \\
+    \midrule
+    \makecell{\textbf{Model}\\\textbf{name}} &
+    \makecell{\textbf{Model}\\\textbf{Params}} &
+    \makecell{\textbf{RAG}\\\textbf{type}} &
+    \makecell{\textbf{Device}\\\textbf{used}} &
+    \makecell{\textbf{Quant}\\\textbf{scheme}} &
+    \makecell{\textbf{Binary}\\\textbf{output}} &
+    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
+    \makecell{\textbf{Accuracy}\\\textbf{(avg. | parsed)}} &
+    \makecell{\textbf{Output tokens}\\\textbf{(avg. | parsed)}} \\
+    \midrule
+    Qwen2-5-3B & 3.09 B & \xmark & GPU & FP16 & \xmark & 97.46\% & \hphantom{}65.80 | 67.46\hphantom{}\% & \hphantom{}279 | 273\hphantom{} \\
+    Qwen2-5-3B & 3.09 B & GPT-4o & GPU & FP16 & \xmark & 72.78\% & \hphantom{}54.51 | 72.47\hphantom{}\% & \hphantom{}439 | 412\hphantom{} \\
+    Qwen2-5-3B & 3.09 B & BGE & GPU & FP16 & \xmark & 84.64\% & \hphantom{}64.72 | 75.19\hphantom{}\% & \hphantom{}395 | 374\hphantom{} \\
+    \midrule
+    Qwen2-5-3B & 3.09 B & \xmark & GPU & FP16 & \cmark & 93.65\% & \hphantom{}79.12 | 85.27\hphantom{}\% & \hphantom{00}8 | 7\hphantom{00} \\
+    Qwen2-5-3B & 3.09 B & GPT-4o & GPU & FP16 & \cmark & 99.94\% & \hphantom{}61.68 | 61.73\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Qwen2-5-3B & 3.09 B & BGE & GPU & FP16 & \cmark & 100.00\% & \hphantom{}62.56 | 62.56\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    \midrule
+    Qwen2-5-3B-SFT & 3.09 B & \xmark & GPU & FP16 & \xmark & 100.00\% & \hphantom{}74.62 | 74.62\hphantom{}\% & \hphantom{0}73 | 73\hphantom{0} \\
+    Qwen2-5-3B-SFT & 3.09 B & GPT-4o & GPU & FP16 & \xmark & 100.00\% & \hphantom{}76.02 | 76.02\hphantom{}\% & \hphantom{0}92 | 92\hphantom{0} \\
+    Qwen2-5-3B-SFT & 3.09 B & BGE & GPU & FP16 & \xmark & 99.56\% & \hphantom{}72.40 | 72.74\hphantom{}\% & \hphantom{0}87 | 87\hphantom{0} \\
+    Qwen2-5-3B-SFT & 3.09 B & \xmark & GPU & FP16 & \cmark & 100.00\% & \hphantom{}75.76 | 75.76\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Qwen2-5-3B-SFT & 3.09 B & GPT-4o & GPU & FP16 & \cmark & 100.00\% & \hphantom{}51.40 | 51.40\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Qwen2-5-3B-SFT & 3.09 B & BGE & GPU & FP16 & \cmark & 100.00\% & \hphantom{}50.89 | 50.89\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Accuracy metrics for Qwen2.5-3B runs.}
+  \label{tab:qwen-3b-acc}
+\end{sidewaystable}
