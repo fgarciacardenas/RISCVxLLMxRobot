@@ -8,6 +8,13 @@
     \midrule
     \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
     \midrule
+    Llama3.1 & 8.03 B & \xmark & \xmark & 100.00\% & \hphantom{}71.38 | 71.38\hphantom{}\% & \hphantom{}129 | 129\hphantom{} \\
+    Llama3.1 & 8.03 B & OpenAI & \xmark & 99.56\% & \hphantom{}68.34 | 68.74\hphantom{}\% & \hphantom{}137 | 135\hphantom{} \\
+    Llama3.1 & 8.03 B & BGE & \xmark & 99.81\% & \hphantom{}67.70 | 67.88\hphantom{}\% & \hphantom{}139 | 139\hphantom{} \\
+    Llama3.1 & 8.03 B & \xmark & \cmark & 100.00\% & \hphantom{}71.13 | 71.13\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.1 & 8.03 B & OpenAI & \cmark & 100.00\% & \hphantom{}58.19 | 58.19\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.1 & 8.03 B & BGE & \cmark & 100.00\% & \hphantom{}55.84 | 55.84\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    \midrule
     Llama3.2 & 3.21 B & \xmark & \xmark & 98.22\% & \hphantom{}70.75 | 72.10\hphantom{}\% & \hphantom{}120 | 113\hphantom{} \\
     Llama3.2 & 3.21 B & OpenAI & \xmark & 97.21\% & \hphantom{}66.24 | 68.52\hphantom{}\% & \hphantom{}124 | 113\hphantom{} \\
     Llama3.2 & 3.21 B & BGE & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
