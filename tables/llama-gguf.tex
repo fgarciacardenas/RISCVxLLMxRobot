@@ -8,26 +8,33 @@
     \midrule
     \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Device}\\\textbf{used}} & \makecell{\textbf{Quant}\\\textbf{scheme}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
     \midrule
-    Llama3.2 & 3.21 B & \xmark & GGUF & Q4.M & \xmark & 99.49\% & \hphantom{}66.43 | 66.78\hphantom{0}\% & \hphantom{}185 | 184\hphantom{} \\
-    Llama3.2 & 3.21 B & OpenAI & GGUF & Q4.M & \xmark & 100.00\% & \hphantom{}64.15 | 64.15\hphantom{0}\% & \hphantom{0}91 | 91\hphantom{0} \\
-    Llama3.2 & 3.21 B & BGE & GGUF & Q4.M & \xmark & 99.75\% & \hphantom{}68.85 | 69.04\hphantom{0}\% & \hphantom{}104 | 103\hphantom{} \\
-    Llama3.2 & 3.21 B & \xmark & GGUF & Q4.M & \cmark & 0.25\% & \hphantom{0}0.06 | 25.00\hphantom{0}\% & \hphantom{0}23 | 7\hphantom{00} \\
-    Llama3.2 & 3.21 B & OpenAI & GGUF & Q4.M & \cmark & 1.65\% & \hphantom{0}0.57 | 31.19\hphantom{0}\% & \hphantom{0}69 | 7\hphantom{00} \\
-    Llama3.2 & 3.21 B & BGE & GGUF & Q4.M & \cmark & 1.40\% & \hphantom{0}0.76 | 43.81\hphantom{0}\% & \hphantom{0}48 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & \xmark & GPU & FP16 & \xmark & 98.22\% & \hphantom{}70.75 | 72.10\hphantom{}\% & \hphantom{}120 | 113\hphantom{} \\
+    Llama3.2 & 3.21 B & OpenAI & GPU & FP16 & \xmark & 97.21\% & \hphantom{}66.24 | 68.52\hphantom{}\% & \hphantom{}124 | 113\hphantom{} \\
+    Llama3.2 & 3.21 B & BGE & GPU & FP16 & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
+    Llama3.2 & 3.21 B & \xmark & GPU & FP16 & \cmark & 100.00\% & \hphantom{}59.33 | 59.33\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & OpenAI & GPU & FP16 & \cmark & 100.00\% & \hphantom{}64.40 | 64.40\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & BGE & GPU & FP16 & \cmark & 100.00\% & \hphantom{}66.75 | 66.75\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \midrule
-    Llama3.2 & 3.21 B & \xmark & GGUF & Q5.M & \xmark & 99.11\% & \hphantom{}66.94 | 67.61\hphantom{0}\% & \hphantom{}104 | 101\hphantom{} \\
-    Llama3.2 & 3.21 B & OpenAI & GGUF & Q5.M & \xmark & 100.00\% & \hphantom{}71.26 | 71.26\hphantom{0}\% & \hphantom{0}83 | 83\hphantom{0} \\
-    Llama3.2 & 3.21 B & BGE & GGUF & Q5.M & \xmark & 99.87\% & \hphantom{}75.89 | 75.99\hphantom{0}\% & \hphantom{0}81 | 81\hphantom{0} \\
-    Llama3.2 & 3.21 B & \xmark & GGUF & Q5.M & \cmark & 1.59\% & \hphantom{0}1.33 | 84.00\hphantom{0}\% & \hphantom{0}27 | 7\hphantom{00} \\
-    Llama3.2 & 3.21 B & OpenAI & GGUF & Q5.M & \cmark & 0.76\% & \hphantom{0}0.25 | 41.67\hphantom{0}\% & \hphantom{0}43 | 7\hphantom{00} \\
-    Llama3.2 & 3.21 B & BGE & GGUF & Q5.M & \cmark & 0.25\% & \hphantom{0}0.25 | 100.00\hphantom{}\% & \hphantom{0}31 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF & Q4.M & \xmark & 99.49\% & \hphantom{}66.43 | 66.78\hphantom{}\% & \hphantom{}185 | 184\hphantom{} \\
+    Llama3.2 & 3.21 B & OpenAI & GGUF & Q4.M & \xmark & 100.00\% & \hphantom{}64.15 | 64.15\hphantom{}\% & \hphantom{0}91 | 91\hphantom{0} \\
+    Llama3.2 & 3.21 B & BGE & GGUF & Q4.M & \xmark & 99.75\% & \hphantom{}68.85 | 69.04\hphantom{}\% & \hphantom{}104 | 103\hphantom{} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF & Q4.M & \cmark & 100.00\% & \hphantom{}66.94 | 66.94\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & OpenAI & GGUF & Q4.M & \cmark & 100.00\% & \hphantom{}61.74 | 61.74\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & BGE & GGUF & Q4.M & \cmark & 100.00\% & \hphantom{}56.41 | 56.41\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \midrule
-    Llama3.2 & 3.21 B & \xmark & GGUF & Q8.0 & \xmark & 99.94\% & \hphantom{}69.67 | 69.72\hphantom{0}\% & \hphantom{}102 | 102\hphantom{} \\
-    Llama3.2 & 3.21 B & OpenAI & GGUF & Q8.0 & \xmark & 100.00\% & \hphantom{}70.49 | 70.49\hphantom{0}\% & \hphantom{0}76 | 76\hphantom{0} \\
-    Llama3.2 & 3.21 B & BGE & GGUF & Q8.0 & \xmark & 100.00\% & \hphantom{}69.73 | 69.73\hphantom{0}\% & \hphantom{0}79 | 79\hphantom{0} \\
-    Llama3.2 & 3.21 B & \xmark & GGUF & Q8.0 & \cmark & 3.81\% & \hphantom{0}3.43 | 72.10\hphantom{0}\% & \hphantom{0}15 | 7\hphantom{00} \\
-    Llama3.2 & 3.21 B & OpenAI & GGUF & Q8.0 & \cmark & 4.89\% & \hphantom{0}2.60 | 52.67\hphantom{0}\% & \hphantom{0}47 | 7\hphantom{00} \\
-    Llama3.2 & 3.21 B & BGE & GGUF & Q8.0 & \cmark & 4.19\% & \hphantom{0}3.43 | 59.75\hphantom{0}\% & \hphantom{0}40 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF & Q5.M & \xmark & 99.11\% & \hphantom{}66.94 | 67.61\hphantom{}\% & \hphantom{}104 | 101\hphantom{} \\
+    Llama3.2 & 3.21 B & OpenAI & GGUF & Q5.M & \xmark & 100.00\% & \hphantom{}71.26 | 71.26\hphantom{}\% & \hphantom{0}83 | 83\hphantom{0} \\
+    Llama3.2 & 3.21 B & BGE & GGUF & Q5.M & \xmark & 99.87\% & \hphantom{}75.89 | 75.99\hphantom{}\% & \hphantom{0}81 | 81\hphantom{0} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF & Q5.M & \cmark & 100.00\% & \hphantom{}68.59 | 68.59\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & OpenAI & GGUF & Q5.M & \cmark & 100.00\% & \hphantom{}64.72 | 64.72\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & BGE & GGUF & Q5.M & \cmark & 100.00\% & \hphantom{}63.71 | 63.71\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    \midrule
+    Llama3.2 & 3.21 B & \xmark & GGUF & Q8.0 & \xmark & 99.94\% & \hphantom{}69.67 | 69.72\hphantom{}\% & \hphantom{}102 | 102\hphantom{} \\
+    Llama3.2 & 3.21 B & OpenAI & GGUF & Q8.0 & \xmark & 100.00\% & \hphantom{}70.49 | 70.49\hphantom{}\% & \hphantom{0}76 | 76\hphantom{0} \\
+    Llama3.2 & 3.21 B & BGE & GGUF & Q8.0 & \xmark & 100.00\% & \hphantom{}69.73 | 69.73\hphantom{}\% & \hphantom{0}79 | 79\hphantom{0} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF & Q8.0 & \cmark & 100.00\% & \hphantom{}68.65 | 68.65\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & OpenAI & GGUF & Q8.0 & \cmark & 100.00\% & \hphantom{}65.16 | 65.16\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & BGE & GGUF & Q8.0 & \cmark & 100.00\% & \hphantom{}60.85 | 60.85\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \bottomrule
   \end{tabular}
   \caption{Comparison of Llama3 GGUF models with different quantization approaches.}
