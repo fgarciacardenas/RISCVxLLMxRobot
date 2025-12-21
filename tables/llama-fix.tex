@@ -1,21 +1,24 @@
-\begin{sidewaystable}
+\begin{table}
   \centering
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.2}
-  \begin{tabular}{lcccccccc}
+  \begin{tabular}{lcccccc}
     \toprule
-    \multicolumn{9}{c}{\cellcolor{ggufColor} \textbf{Accuracy metrics}} \\
+    \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{Accuracy metrics}} \\
     \midrule
-    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Device}\\\textbf{used}} & \makecell{\textbf{Quant}\\\textbf{scheme}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Structure}\\\textbf{followed (\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Output tokens}\\\textbf{(avg. | par.)}} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
     \midrule
-    Llama3.2 & 3.21 B & \xmark & GPU & FP16 & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{0}46 | 0\hphantom{} \\
-    Llama3.2 & 3.21 B & OpenAI & GPU & FP16 & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}103 | 0\hphantom{} \\
-    Llama3.2 & 3.21 B & BGE & GPU & FP16 & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}119 | 0\hphantom{} \\
-    Llama3.2 & 3.21 B & \xmark & GPU & FP16 & \cmark & 100.00\% & \hphantom{}59.33 | 59.33\hphantom{}\% & \hphantom{00}7 | 7\hphantom{} \\
-    Llama3.2 & 3.21 B & OpenAI & GPU & FP16 & \cmark & 100.00\% & \hphantom{}64.40 | 64.40\hphantom{}\% & \hphantom{00}7 | 7\hphantom{} \\
-    Llama3.2 & 3.21 B & BGE & GPU & FP16 & \cmark & 100.00\% & \hphantom{}66.75 | 66.75\hphantom{}\% & \hphantom{00}7 | 7\hphantom{} \\
+    \multicolumn{7}{l}{\textbf{Default binary prompt (unparseable)}} \\
+    Llama3.2 & 3.21 B & \xmark & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{0}46 | 0\hphantom{} \\
+    Llama3.2 & 3.21 B & OpenAI & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}103 | 0\hphantom{} \\
+    Llama3.2 & 3.21 B & BGE & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}119 | 0\hphantom{} \\
+    \midrule
+    \multicolumn{7}{l}{\textbf{Llama-only prompt fix (strict single-line output)}} \\
+    Llama3.2 & 3.21 B & \xmark & \cmark & 100.00\% & \hphantom{}59.33 | 59.33\hphantom{}\% & \hphantom{00}7 | 7\hphantom{} \\
+    Llama3.2 & 3.21 B & OpenAI & \cmark & 100.00\% & \hphantom{}64.40 | 64.40\hphantom{}\% & \hphantom{00}7 | 7\hphantom{} \\
+    Llama3.2 & 3.21 B & BGE & \cmark & 100.00\% & \hphantom{}66.75 | 66.75\hphantom{}\% & \hphantom{00}7 | 7\hphantom{} \\
     \bottomrule
   \end{tabular}
   \caption{Comparison of Llama3.2-3B with the prompt fix.}
   \label{tab:llama-fix}
-\end{sidewaystable}
+\end{table}
