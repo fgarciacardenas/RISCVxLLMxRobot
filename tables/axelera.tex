@@ -8,12 +8,13 @@
     \midrule
     \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Device}\\\textbf{used}} & \makecell{\textbf{Quant}\\\textbf{scheme}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
     \midrule
-    Llama3.2 & 3.21 B & \xmark & GPU & FP16 & \xmark & 98.22\% & \hphantom{}70.75 | 72.10\hphantom{}\% & \hphantom{}120 | 113\hphantom{} \\
-    Llama3.2 & 3.21 B & OpenAI & GPU & FP16 & \xmark & 97.21\% & \hphantom{}66.24 | 68.52\hphantom{}\% & \hphantom{}124 | 113\hphantom{} \\
-    Llama3.2 & 3.21 B & BGE & GPU & FP16 & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
-    Llama3.2 & 3.21 B & \xmark & GPU & FP16 & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{0}46 | 0\hphantom{00} \\
-    Llama3.2 & 3.21 B & OpenAI & GPU & FP16 & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}103 | 0\hphantom{00} \\
-    Llama3.2 & 3.21 B & BGE & GPU & FP16 & \cmark & 0.00\% & \hphantom{0}0.00 | 0.00\hphantom{0}\% & \hphantom{}119 | 0\hphantom{00} \\
+    Llama3.1 & 8.03 B & \xmark & Axelera & INT8 & \xmark & 87.12\% & \hphantom{}55.20 | 63.64\hphantom{}\% & \hphantom{0}85 | 87\hphantom{0} \\
+    Llama3.1 & 8.03 B & OpenAI & Axelera & INT8 & \xmark & 79.63\% & \hphantom{}52.54 | 65.69\hphantom{}\% & \hphantom{}109 | 106\hphantom{} \\
+    Llama3.1 & 8.03 B & BGE & Axelera & INT8 & \xmark & 85.22\% & \hphantom{}59.20 | 69.90\hphantom{}\% & \hphantom{}102 | 98\hphantom{0} \\
+    Llama3.1 & 8.03 B & \xmark & Axelera & INT8 & \cmark & 65.93\% & \hphantom{}40.61 | 59.96\hphantom{}\% & \hphantom{0}25 | 7\hphantom{00} \\
+    Llama3.1 & 8.03 B & OpenAI & Axelera & INT8 & \cmark & 65.29\% & \hphantom{}43.59 | 64.39\hphantom{}\% & \hphantom{0}25 | 7\hphantom{00} \\
+    Llama3.1 & 8.03 B & BGE & Axelera & INT8 & \cmark & 68.97\% & \hphantom{}43.78 | 61.88\hphantom{}\% & \hphantom{0}24 | 7\hphantom{00} \\
+    \midrule
     Llama3.2 & 3.21 B & \xmark & Axelera & INT8 & \xmark & 81.92\% & \hphantom{}58.95 | 71.75\hphantom{}\% & \hphantom{}162 | 150\hphantom{} \\
     Llama3.2 & 3.21 B & OpenAI & Axelera & INT8 & \xmark & 50.76\% & \hphantom{}32.42 | 63.28\hphantom{}\% & \hphantom{}181 | 173\hphantom{} \\
     Llama3.2 & 3.21 B & BGE & Axelera & INT8 & \xmark & 49.62\% & \hphantom{}34.33 | 67.62\hphantom{}\% & \hphantom{}188 | 179\hphantom{} \\
@@ -21,12 +22,6 @@
     Llama3.2 & 3.21 B & OpenAI & Axelera & INT8 & \cmark & 49.56\% & \hphantom{}22.14 | 56.02\hphantom{}\% & \hphantom{0}64 | 7\hphantom{00} \\
     Llama3.2 & 3.21 B & BGE & Axelera & INT8 & \cmark & 41.81\% & \hphantom{}17.51 | 39.73\hphantom{}\% & \hphantom{0}69 | 7\hphantom{00} \\
     \midrule
-    Phi3 & 3.80 B & \xmark & GPU & FP16 & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
-    Phi3 & 3.80 B & OpenAI & GPU & FP16 & \xmark & 100.00\% & \hphantom{}79.31 | 79.31\hphantom{}\% & \hphantom{}150 | 150\hphantom{} \\
-    Phi3 & 3.80 B & BGE & GPU & FP16 & \xmark & 100.00\% & \hphantom{}77.86 | 77.86\hphantom{}\% & \hphantom{}160 | 160\hphantom{} \\
-    Phi3 & 3.80 B & \xmark & GPU & FP16 & \cmark & 100.00\% & \hphantom{}70.88 | 70.88\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
-    Phi3 & 3.80 B & OpenAI & GPU & FP16 & \cmark & 88.71\% & \hphantom{}71.70 | 82.40\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
-    Phi3 & 3.80 B & BGE & GPU & FP16 & \cmark & 95.81\% & \hphantom{}75.51 | 76.98\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     Phi3 & 3.80 B & \xmark & Axelera & INT8 & \xmark & 97.02\% & \hphantom{}55.84 | 57.54\hphantom{}\% & \hphantom{}223 | 221\hphantom{} \\
     Phi3 & 3.80 B & OpenAI & Axelera & INT8 & \xmark & 88.01\% & \hphantom{}46.76 | 52.90\hphantom{}\% & \hphantom{}182 | 177\hphantom{} \\
     Phi3 & 3.80 B & BGE & Axelera & INT8 & \xmark & 92.20\% & \hphantom{}53.05 | 57.51\hphantom{}\% & \hphantom{}178 | 173\hphantom{} \\
@@ -35,6 +30,6 @@
     Phi3 & 3.80 B & BGE & Axelera & INT8 & \cmark & 90.86\% & \hphantom{}56.35 | 61.50\hphantom{}\% & \hphantom{0}19 | 7\hphantom{00} \\
     \bottomrule
   \end{tabular}
-  \caption{GPU FP16 vs Axelera Metis INT8 accuracy for Phi-3 and Llama-3.2 across retrieval settings and output modes (explanatory vs binary).}
+  \caption{Axelera Metis INT8 accuracy for Phi-3, Llama-3.1, and Llama-3.2 across retrieval settings and output modes (explanatory vs binary).}
   \label{tab:axelera}
 \end{sidewaystable}
