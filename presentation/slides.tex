@@ -10,19 +10,33 @@
 \usepackage{tikz}
 \usepackage{xcolor}
 \usepackage{colortbl}
+\usepackage{pifont}
 \usetikzlibrary{positioning}
 
 \graphicspath{{assets/}}
 
 \definecolor{SlideAccent}{HTML}{0B3D91}
-\definecolor{TableHeader}{HTML}{EEF3FA}
-\definecolor{TableGood}{HTML}{E8F6EF}
-\definecolor{TableWarn}{HTML}{FFF5E6}
-\definecolor{TableBad}{HTML}{FDECEA}
+
+% Report table style (mirrors report/preamble/preamble.tex)
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\definecolor{gpuColor}{RGB}{217,234,211}     % D9EAD3
+\definecolor{ggufColor}{RGB}{217,210,233}    % D9D2E9
+\definecolor{axeleraColor}{RGB}{207,226,243} % CFE2F3
+\definecolor{averageColor}{RGB}{230,230,230}
+\definecolor{promptColor}{RGB}{255,242,204}  % FFF2CC
+\definecolor{ragColor}{RGB}{244,204,204}     % F4CCCC
+\definecolor{outputColor}{RGB}{201,218,248}  % C9DAF8
 
 \setbeamercolor{alerted text}{fg=SlideAccent}
 \setbeamercolor{progress bar}{fg=SlideAccent}
 \setbeamercolor{title separator}{fg=SlideAccent}
+
+% White background everywhere (including Metropolis title/frametitle bars)
+\setbeamercolor{background canvas}{bg=white}
+\setbeamercolor{normal text}{fg=black,bg=white}
+\setbeamercolor{frametitle}{fg=black,bg=white}
+\setbeamercolor{title}{fg=black,bg=white}
 
 \title{RISCVxLLMxRobot}
 \subtitle{Hybrid MPC+LLM decision-making on Axelera Metis: RAG, early stopping, quantization, and SFT}
@@ -119,14 +133,14 @@
 \begin{frame}{Pipeline overview (backend-agnostic)}
   \centering
   \begin{tikzpicture}[node distance=9mm, every node/.style={font=\small}, rounded corners]
-    \node[draw, fill=TableHeader, align=center, minimum width=3.0cm, minimum height=1.1cm] (data) {State window\\+ intent};
-    \node[draw, fill=TableHeader, right=of data, align=center, minimum width=3.0cm, minimum height=1.1cm] (prompt) {Prompt builder\\(shared)};
-    \node[draw, fill=TableHeader, right=of prompt, align=center, minimum width=3.0cm, minimum height=1.1cm] (rag) {RAG (optional)\\OpenAI / BGE};
+    \node[draw, fill=averageColor, align=center, minimum width=3.0cm, minimum height=1.1cm] (data) {State window\\+ intent};
+    \node[draw, fill=averageColor, right=of data, align=center, minimum width=3.0cm, minimum height=1.1cm] (prompt) {Prompt builder\\(shared)};
+    \node[draw, fill=averageColor, right=of prompt, align=center, minimum width=3.0cm, minimum height=1.1cm] (rag) {RAG (optional)\\OpenAI / BGE};
 
-    \node[draw, fill=TableHeader, below=of rag, align=center, minimum width=3.2cm, minimum height=1.1cm] (backend) {Inference backend\\GPU / GGUF / Axelera};
-    \node[draw, fill=TableHeader, below=of backend, align=center, minimum width=3.2cm, minimum height=1.1cm] (parse) {Parser \& metrics\\(shared)};
+    \node[draw, fill=averageColor, below=of rag, align=center, minimum width=3.2cm, minimum height=1.1cm] (backend) {Inference backend\\GPU / GGUF / Axelera};
+    \node[draw, fill=averageColor, below=of backend, align=center, minimum width=3.2cm, minimum height=1.1cm] (parse) {Parser \& metrics\\(shared)};
 
-    \node[draw, fill=TableGood, below=of prompt, align=center, minimum width=3.0cm, minimum height=1.0cm] (binary) {Binary head\\+ early stop};
+    \node[draw, fill=gpuColor, below=of prompt, align=center, minimum width=3.0cm, minimum height=1.0cm] (binary) {Binary head\\+ early stop};
 
     \draw[->, thick] (data) -- (prompt);
     \draw[->, thick] (prompt) -- (rag);
@@ -149,116 +163,190 @@
 \end{frame}
 
 \begin{frame}{RAG on GPU: on-board BGE vs cloud OpenAI embeddings}
-  \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabularx}{\textwidth}{l l c c c}
+  \scriptsize
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lcccc}
     \toprule
-    \textbf{Model} & \textbf{RAG} & {\textbf{Struct (\%)}} & {\textbf{Parsed acc (\%)}} & {\textbf{Out tok}} \\
+    \multicolumn{5}{c}{\cellcolor{gpuColor} \textbf{GPU FP16 baselines (RAG comparison)}} \\
     \midrule
-    Phi-3 (3.8B) & none   & 99.18 & 72.39 & 114 \\
-    \rowcolor{TableHeader}
-    Phi-3 (3.8B) & OpenAI & 100.00 & \cellcolor{TableGood}\textbf{79.31} & 150 \\
-    Phi-3 (3.8B) & BGE    & 100.00 & 77.86 & 160 \\
-    \addlinespace
-    Llama-3.2 (3.2B) & none & 98.22 & 72.10 & 120 \\
-    \rowcolor{TableHeader}
-    Llama-3.2 (3.2B) & BGE  & \cellcolor{TableWarn}86.42 & \cellcolor{TableGood}\textbf{80.58} & \cellcolor{TableWarn}227 \\
-    \addlinespace
-    Qwen2.5 (7.6B) & none & 100.00 & 81.35 & 109 \\
-    \rowcolor{TableHeader}
-    Qwen2.5 (7.6B) & BGE  & 100.00 & \cellcolor{TableGood}\textbf{86.55} & 124 \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Out tok}\\\textbf{(avg.)}} \\
+    \midrule
+    Phi3 & \xmark & 99.18\% & 71.83 | 72.39\% & 114 \\
+    Phi3 & OpenAI & 100.00\% & \textbf{79.31 | 79.31\%} & 150 \\
+    Phi3 & BGE & 100.00\% & 77.86 | 77.86\% & 160 \\
+    \midrule
+    Llama3.2 & \xmark & 98.22\% & 70.75 | 72.10\% & 120 \\
+    Llama3.2 & BGE & \cellcolor{ragColor}86.42\% & 69.54 | \textbf{80.58\%} & \cellcolor{outputColor}227 \\
+    \midrule
+    Qwen2.5 (7B) & \xmark & 100.00\% & 81.35 | 81.35\% & 109 \\
+    Qwen2.5 (7B) & BGE & 100.00\% & \textbf{86.55 | 86.55\%} & 124 \\
     \bottomrule
-  \end{tabularx}
+  \end{tabular}
 
-  \vspace{0.6em}
+  \vspace{0.7em}
   \footnotesize
-  Takeaway: BGE often matches the cloud retriever, but some backbones trade parsed gains for lower structure or higher verbosity.
+  Takeaway: BGE (on-board) often matches the cloud retriever, but the effect depends on backbone and can interact with structure-followed rate.
+\end{frame}
+
+\begin{frame}{Why tokens matter (Phi-3 example)}
+  \scriptsize
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lccc}
+    \toprule
+    \multicolumn{4}{c}{\cellcolor{gpuColor} \textbf{Token-length summary (Phi-3, GPU)}} \\
+    \midrule
+    \textbf{Metric (mean)} & \textbf{No RAG} & \textbf{OpenAI RAG} & \textbf{BGE RAG} \\
+    \midrule
+    \rowcolor{promptColor} Prompt tokens & 607.3 & 762.8 & 751.3 \\
+    \rowcolor{ragColor} RAG hint tokens & 0.0 & 156.5 & 145.0 \\
+    \rowcolor{outputColor} Output tokens & 115.1 & 150.9 & 158.7 \\
+    \rowcolor{averageColor} \textbf{Context tokens} & \textbf{722.4} & \textbf{913.7} & \textbf{910.0} \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.7em}
+  \footnotesize
+  Takeaway: decoding cost scales with generated output tokens; early stopping targets the most controllable term.
+\end{frame}
+
+\begin{frame}{Phi-3 per-behavior accuracy (GPU)}
+  \scriptsize
+  \setlength{\tabcolsep}{7pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lccc}
+    \toprule
+    \multicolumn{4}{c}{\cellcolor{gpuColor} \textbf{Per-behavior accuracy (Phi-3, GPU)}} \\
+    \midrule
+    \textbf{Behavior} & \textbf{No RAG} & \textbf{OpenAI RAG} & \textbf{BGE RAG} \\
+    \midrule
+    Centerline    & 83.15\% & 91.85\% & 84.24\% \\
+    Close to wall & 56.50\% & 68.00\% & 59.00\% \\
+    Forward       & 76.00\% & 82.50\% & 77.50\% \\
+    Oscillating   & 77.00\% & 83.00\% & 79.50\% \\
+    Racingline    & 72.00\% & 79.50\% & 79.00\% \\
+    Reversed      & 49.48\% & 66.67\% & \textbf{79.17\%} \\
+    Speed         & 75.00\% & 77.00\% & 77.00\% \\
+    Stop          & 86.00\% & 85.50\% & 85.00\% \\
+    \midrule
+    \rowcolor{averageColor}
+    \textbf{Average} & \textbf{71.89\%} & \textbf{79.25\%} & \textbf{77.55\%} \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.7em}
+  \footnotesize
+  Takeaway: RAG helps most on hard cases (e.g., \textit{Reversed}) while leaving easy behaviors largely unchanged.
 \end{frame}
 
 \begin{frame}{Binary decision head + early stopping (GPU)}
-  \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabularx}{\textwidth}{l l c c c c}
+  \scriptsize
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lcccccc}
     \toprule
-    \textbf{Model} & \textbf{Mode} & {\textbf{Struct (\%)}} & {\textbf{Parsed acc (\%)}} & {\textbf{Out tok}} & {\textbf{$\times$ tok}} \\
+    \multicolumn{7}{c}{\cellcolor{gpuColor} \textbf{Binary decision head with early stopping (GPU)}} \\
     \midrule
-    Phi-3 (3.8B) & explanatory & 99.18 & 72.39 & 114 & 1 \\
-    \rowcolor{TableHeader}
-    Phi-3 (3.8B) & binary      & 100.00 & 70.88 & \cellcolor{TableGood}\textbf{7} & \cellcolor{TableGood}\textbf{16.3} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \midrule
+    Phi3 & 3.80 B & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
+    Phi3 & 3.80 B & \xmark & \cmark & 100.00\% & \hphantom{}70.88 | 70.88\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \addlinespace
-    Qwen2.5 (7.6B) & explanatory & 100.00 & 81.35 & 109 & 1 \\
-    \rowcolor{TableHeader}
-    Qwen2.5 (7.6B) & binary      & 100.00 & 81.47 & \cellcolor{TableGood}\textbf{7} & \cellcolor{TableGood}\textbf{15.6} \\
+    Qwen2.5 & 7.61 B & \xmark & \xmark & 100.00\% & \hphantom{}81.35 | 81.35\hphantom{}\% & \hphantom{}109 | 109\hphantom{} \\
+    Qwen2.5 & 7.61 B & \xmark & \cmark & 100.00\% & \hphantom{}81.47 | 81.47\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \bottomrule
-  \end{tabularx}
+  \end{tabular}
+\vspace{0.7em}
+\footnotesize{Takeaway: binary outputs reduce generation from $\sim$100+ tokens to 7 with minimal accuracy change (when structure is followed).}
+\end{frame}
 
-  \vspace{0.6em}
-  \footnotesize
-  Takeaway: for compliant backbones, early stopping cuts output tokens by $>10\times$ with small accuracy impact.
+\begin{frame}{Binary head: what it enables}
+  \begin{itemize}
+    \item \textbf{Verifiable output:} single-line decision is easy to parse and score.
+    \item \textbf{Early stopping:} stop as soon as the decision is produced (avoid long explanations).
+    \item \textbf{Efficiency:} token reduction typically yields lower latency and energy per decision.
+    \item \textbf{Robustness lever:} if structure-followed drops, average accuracy collapses even if parsed accuracy is high.
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{GGUF quantization (Q4.M, \texttt{llama.cpp})}
-  \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabularx}{\textwidth}{l l l c c c}
+  \scriptsize
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lcccccc}
     \toprule
-    \textbf{Model} & \textbf{RAG} & \textbf{Device} & {\textbf{Struct (\%)}} & {\textbf{Parsed acc (\%)}} & {\textbf{Out tok}} \\
+    \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{GGUF quantization (Q4.M) vs GPU FP16}} \\
     \midrule
-    Phi-3 (3.8B) & BGE  & GPU FP16  & 100.00 & \cellcolor{TableGood}\textbf{77.86} & 160 \\
-    \rowcolor{TableHeader}
-    Phi-3 (3.8B) & BGE  & GGUF Q4.M & 99.81 & 72.06 & \cellcolor{TableGood}\textbf{63} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Device}\\\textbf{used}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \midrule
+    Phi3 & 3.80 B & BGE & GPU (FP16) & 100.00\% & \hphantom{}77.86 | 77.86\hphantom{}\% & \hphantom{}160 | 160\hphantom{} \\
+    Phi3 & 3.80 B & BGE & GGUF (Q4.M) & 99.81\% & \hphantom{}71.95 | 72.06\hphantom{}\% & \hphantom{0}63 | 63\hphantom{0} \\
     \addlinespace
-    Llama-3.2 (3.2B) & none & GPU FP16  & 98.22 & \cellcolor{TableGood}\textbf{72.10} & 120 \\
-    \rowcolor{TableHeader}
-    Llama-3.2 (3.2B) & none & GGUF Q4.M & 99.49 & 66.78 & 185 \\
+    Llama3.2 & 3.21 B & \xmark & GPU (FP16) & 98.22\% & \hphantom{}70.75 | 72.10\hphantom{}\% & \hphantom{}120 | 113\hphantom{} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF (Q4.M) & 99.49\% & \hphantom{}66.43 | 66.78\hphantom{}\% & \hphantom{}185 | 184\hphantom{} \\
     \bottomrule
-  \end{tabularx}
+  \end{tabular}
+\vspace{0.7em}
+\footnotesize{Takeaway: Q4.M preserves structure but can shift accuracy and output length depending on backbone and prompts.}
+\end{frame}
 
-  \vspace{0.6em}
-  \footnotesize
-  Takeaway: Q4.M keeps structure high but can shift accuracy/verbosity depending on backbone and prompt.
+\begin{frame}{GGUF vs GPU: how to interpret}
+  \begin{itemize}
+    \item \textbf{Strength:} strong compression and fast local runtimes with high structure-followed rates.
+    \item \textbf{Tradeoff:} accuracy and verbosity can shift depending on backbone and prompt template.
+    \item \textbf{Recommendation:} benchmark the exact prompt + output mode (binary vs explanatory) you plan to deploy.
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Axelera Metis (INT8): structure vs decision quality}
-  \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabularx}{\textwidth}{l l l c c c}
+  \scriptsize
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lcccccc}
     \toprule
-    \textbf{Model} & \textbf{RAG} & \textbf{Mode} & {\textbf{Struct (\%)}} & {\textbf{Avg acc (\%)}} & {\textbf{Out tok}} \\
+    \multicolumn{7}{c}{\cellcolor{axeleraColor} \textbf{Axelera Metis INT8 vs GPU baseline}} \\
     \midrule
-    Phi-3 (3.8B) & none & GPU FP16 (exp.)    & 99.18 & \cellcolor{TableGood}\textbf{71.83} & 114 \\
-    \rowcolor{TableHeader}
-    Phi-3 (3.8B) & none & Axelera INT8 (exp.) & 97.02 & 55.84 & \cellcolor{TableWarn}223 \\
-    Phi-3 (3.8B) & none & Axelera INT8 (bin.) & 98.41 & 66.12 & \cellcolor{TableGood}\textbf{9} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \midrule
+    Phi3 & 3.80 B & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
+    Phi3 & 3.80 B & \xmark & \xmark & 97.02\% & \hphantom{}55.84 | 57.54\hphantom{}\% & \hphantom{}223 | 221\hphantom{} \\
+    Phi3 & 3.80 B & \xmark & \cmark & 98.41\% & \hphantom{}66.12 | 67.09\hphantom{}\% & \hphantom{00}9 | 7\hphantom{00} \\
     \addlinespace
-    Llama-3.2 (3.2B) & BGE & GPU FP16 (exp.)    & \cellcolor{TableWarn}86.42 & \cellcolor{TableGood}\textbf{69.54} & \cellcolor{TableWarn}227 \\
-    \rowcolor{TableHeader}
-    Llama-3.2 (3.2B) & BGE & Axelera INT8 (exp.) & \cellcolor{TableBad}49.62 & 34.33 & 188 \\
+    Llama3.2 & 3.21 B & BGE & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
+    Llama3.2 & 3.21 B & BGE & \xmark & 49.62\% & \hphantom{}34.33 | 67.62\hphantom{}\% & \hphantom{}188 | 179\hphantom{} \\
     \bottomrule
-  \end{tabularx}
+  \end{tabular}
+\vspace{0.7em}
+\footnotesize{Takeaway: Metis INT8 keeps structure relatively high, but decision accuracy can drop significantly (especially with RAG).}
+\end{frame}
 
-  \vspace{0.6em}
-  \footnotesize
-  Takeaway: INT8 compilation can preserve parseability yet degrade decision accuracy, pointing to quantization/compiler sensitivity.
+\begin{frame}{Axelera INT8: likely failure mode (hypothesis)}
+  \begin{itemize}
+    \item The same prompts/parsers produce strong structure-followed rates, but accuracy drops under Metis INT8.
+    \item This suggests the bottleneck is \textbf{vendor quantization / compilation} rather than prompt wording.
+    \item RAG can amplify the issue: hint conditioning may be more sensitive to quantization noise.
+    \item Practical next step: tune calibration / compiler settings and re-check per-behavior errors.
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{SFT improves structure and reduces verbosity (Qwen2.5)}
-  \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabularx}{\textwidth}{l l c c c}
+  \scriptsize
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{lccccc}
     \toprule
-    \textbf{Model} & \textbf{Mode} & {\textbf{Struct (\%)}} & {\textbf{Avg acc (\%)}} & {\textbf{Out tok}} \\
+    \multicolumn{6}{c}{\cellcolor{gpuColor} \textbf{Effect of SFT on Qwen2.5 (GPU FP16, no-RAG)}} \\
     \midrule
-    Qwen2.5 7.6B & base (exp.) & 100.00 & 81.35 & 109 \\
-    \rowcolor{TableHeader}
-    Qwen2.5 7.6B & SFT (exp.)  & 100.00 & \cellcolor{TableGood}\textbf{85.28} & \cellcolor{TableGood}\textbf{71} \\
-    Qwen2.5 7.6B & SFT (bin.)  & 100.00 & \cellcolor{TableGood}\textbf{85.72} & \cellcolor{TableGood}\textbf{7} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{SFT}\\\textbf{}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \midrule
+    Qwen2.5 (7.61B) & \xmark & \xmark & 100.00\% & \hphantom{}81.35 | 81.35\hphantom{}\% & \hphantom{}109 | 109\hphantom{} \\
+    Qwen2.5 (7.61B) & \cmark & \xmark & 100.00\% & \hphantom{}85.28 | 85.28\hphantom{}\% & \hphantom{0}71 | 71\hphantom{0} \\
+    Qwen2.5 (7.61B) & \cmark & \cmark & 100.00\% & \hphantom{}85.72 | 85.72\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \bottomrule
-  \end{tabularx}
-
-  \vspace{0.6em}
-  \footnotesize
-  Takeaway: SFT yields near-perfect formatting and shorter outputs while keeping strong decision accuracy.
+  \end{tabular}
+\vspace{0.7em}
+\footnotesize{Takeaway: SFT maintains strong accuracy while improving verbosity/formatting; in binary mode it reliably emits a short decision.}
 \end{frame}
 
 \begin{frame}{Takeaways \& next steps}
