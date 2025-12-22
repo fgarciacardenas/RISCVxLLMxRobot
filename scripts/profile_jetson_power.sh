@@ -97,13 +97,45 @@ ts="$(date +%Y%m%d_%H%M%S)"
 TEGRA_LOG="$LOG_DIR/tegrastats_${ts}.log"
 RUN_LOG="$LOG_DIR/workload_${ts}.log"
 
+CLEANED_UP="0"
 cleanup() {
+  [[ "$CLEANED_UP" == "1" ]] && return 0
+  CLEANED_UP="1"
+
+  if [[ -n "${WORKLOAD_PID:-}" ]] && kill -0 "$WORKLOAD_PID" 2>/dev/null; then
+    kill -TERM "$WORKLOAD_PID" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${TAIL_PID:-}" ]] && kill -0 "$TAIL_PID" 2>/dev/null; then
+    kill -TERM "$TAIL_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [[ -n "${WORKLOAD_PID:-}" ]]; then
+    wait "$WORKLOAD_PID" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${TAIL_PID:-}" ]]; then
+    wait "$TAIL_PID" >/dev/null 2>&1 || true
+  fi
+
   if [[ -n "${TEGRA_PID:-}" ]] && kill -0 "$TEGRA_PID" 2>/dev/null; then
     sudo kill -INT "$TEGRA_PID" >/dev/null 2>&1 || true
+    # If sudo is the parent, also try to stop its child process.
+    child_pid="$(pgrep -P "$TEGRA_PID" 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$child_pid" ]]; then
+      sudo kill -INT "$child_pid" >/dev/null 2>&1 || true
+    fi
     wait "$TEGRA_PID" >/dev/null 2>&1 || true
   fi
 }
-trap cleanup EXIT INT TERM
+
+on_interrupt() {
+  echo
+  echo "Interrupted; stopping workload + tegrastats..."
+  cleanup
+  exit 130
+}
+
+trap cleanup EXIT
+trap on_interrupt INT TERM
 
 echo "Logs:"
 echo "  tegrastats: $TEGRA_LOG"
@@ -120,10 +152,22 @@ if [[ "$BASELINE_S" != "0" ]]; then
 fi
 
 echo "Running workload in container '$CONTAINER'..."
+
+# Run workload with a real PID we can stop, while still streaming logs.
+rm -f "$RUN_LOG"
+docker exec -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+WORKLOAD_PID=$!
+
+tail -n +1 -f "$RUN_LOG" &
+TAIL_PID=$!
+
 set +e
-docker exec -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" 2>&1 | tee "$RUN_LOG"
-WORKLOAD_EXIT=${PIPESTATUS[0]}
+wait "$WORKLOAD_PID"
+WORKLOAD_EXIT=$?
 set -e
+
+kill -TERM "$TAIL_PID" >/dev/null 2>&1 || true
+wait "$TAIL_PID" >/dev/null 2>&1 || true
 
 echo "Stopping tegrastats..."
 cleanup
