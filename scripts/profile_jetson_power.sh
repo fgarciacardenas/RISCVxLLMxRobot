@@ -28,18 +28,21 @@ EOF
 }
 
 CONTAINER="embodiedai_dock"
-WORKDIR="/embodiedai/src/LLMxRobot"
+WORKDIR="/embodiedai"
 CMD="./run_decision_tests_gpu_gguf.sh"
 INTERVAL_MS="200"
 BASELINE_S="10"
 RAILS_CSV="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV"
 LOG_DIR="src/LLMxRobot/logs/power_profiles"
 
+WORKDIR_SET_BY_USER="0"
+CMD_SET_BY_USER="0"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --container) CONTAINER="${2:?}"; shift 2 ;;
-    --workdir) WORKDIR="${2:?}"; shift 2 ;;
-    --cmd) CMD="${2:?}"; shift 2 ;;
+    --workdir) WORKDIR="${2:?}"; WORKDIR_SET_BY_USER="1"; shift 2 ;;
+    --cmd) CMD="${2:?}"; CMD_SET_BY_USER="1"; shift 2 ;;
     --interval-ms) INTERVAL_MS="${2:?}"; shift 2 ;;
     --baseline-s) BASELINE_S="${2:?}"; shift 2 ;;
     --rails) RAILS_CSV="${2:?}"; shift 2 ;;
@@ -51,6 +54,43 @@ done
 
 command -v tegrastats >/dev/null 2>&1 || { echo "tegrastats not found on host PATH." >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "docker not found on host PATH." >&2; exit 1; }
+
+if [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo false)" != "true" ]]; then
+  echo "Container '$CONTAINER' is not running (or not found). Start it first, then retry." >&2
+  exit 1
+fi
+
+container_has_dir() {
+  local dir="$1"
+  docker exec -i "$CONTAINER" bash -lc "test -d '$dir'" >/dev/null 2>&1
+}
+
+container_has_file() {
+  local path="$1"
+  docker exec -i "$CONTAINER" bash -lc "test -f '$path'" >/dev/null 2>&1
+}
+
+if [[ "$WORKDIR_SET_BY_USER" == "1" ]]; then
+  if ! container_has_dir "$WORKDIR"; then
+    echo "Workdir not found in container: $WORKDIR" >&2
+    echo "Try --workdir /embodiedai (LLMxRobot is mounted there on Jetson by default)." >&2
+    exit 1
+  fi
+else
+  if container_has_dir "/embodiedai"; then
+    WORKDIR="/embodiedai"
+  elif container_has_dir "/embodiedai/src/LLMxRobot"; then
+    WORKDIR="/embodiedai/src/LLMxRobot"
+  fi
+fi
+
+if [[ "$CMD_SET_BY_USER" == "0" ]]; then
+  if container_has_file "$WORKDIR/run_decision_tests_gpu_gguf.sh"; then
+    CMD="./run_decision_tests_gpu_gguf.sh"
+  elif container_has_file "$WORKDIR/src/LLMxRobot/run_decision_tests_gpu_gguf.sh"; then
+    CMD="bash src/LLMxRobot/run_decision_tests_gpu_gguf.sh"
+  fi
+fi
 
 mkdir -p "$LOG_DIR"
 ts="$(date +%Y%m%d_%H%M%S)"
@@ -136,4 +176,3 @@ done
 
 echo
 exit "$WORKLOAD_EXIT"
-
