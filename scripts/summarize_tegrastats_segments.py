@@ -24,13 +24,21 @@ def parse_tegrastats_time_to_epoch(line: str) -> float | None:
         return None
 
 
-def iter_tegrastats_samples(path: str, rail: str):
+def iter_tegrastats_samples(path: str, rail: str, dt_s: float):
     rail_re = re.compile(rf"{re.escape(rail)}\s+(\d+)mW\b")
+    base_epoch = None
+    idx = -1
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
-            ts = parse_tegrastats_time_to_epoch(line)
-            if ts is None:
+            ts_wall = parse_tegrastats_time_to_epoch(line)
+            if ts_wall is None:
                 continue
+            if base_epoch is None:
+                base_epoch = ts_wall
+                idx = 0
+            else:
+                idx += 1
+            ts = float(base_epoch) + (idx * dt_s)
             m = rail_re.search(line)
             if not m:
                 continue
@@ -65,13 +73,21 @@ def read_event_intervals(run_log: str, start_event: str, end_event: str, prefix:
     return intervals, start_t, (start_payload or {})
 
 
-def last_tegrastats_epoch(path: str) -> float | None:
+def last_tegrastats_epoch(path: str, dt_s: float) -> float | None:
     last = None
+    base_epoch = None
+    idx = -1
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
-            ts = parse_tegrastats_time_to_epoch(line)
-            if ts is not None:
-                last = ts
+            ts_wall = parse_tegrastats_time_to_epoch(line)
+            if ts_wall is None:
+                continue
+            if base_epoch is None:
+                base_epoch = ts_wall
+                idx = 0
+            else:
+                idx += 1
+            last = float(base_epoch) + (idx * dt_s)
     return last
 
 
@@ -127,7 +143,7 @@ def main():
     intervals, open_start_t, open_meta = read_event_intervals(args.run_log, args.start_event, args.end_event)
     if open_start_t is not None:
         # If interrupted mid-decode, approximate the end as the last tegrastats timestamp (or "now").
-        end_t = last_tegrastats_epoch(args.tegrastats_log) or time.time()
+        end_t = last_tegrastats_epoch(args.tegrastats_log, dt_s) or time.time()
         if end_t >= open_start_t:
             intervals.append((open_start_t, end_t, open_meta))
     if not intervals:
@@ -139,7 +155,7 @@ def main():
     if args.baseline_samples > 0:
         for rail in rails:
             vals = []
-            for i, (_ts, p_mw) in enumerate(iter_tegrastats_samples(args.tegrastats_log, rail)):
+            for i, (_ts, p_mw) in enumerate(iter_tegrastats_samples(args.tegrastats_log, rail, dt_s)):
                 if i >= args.baseline_samples:
                     break
                 vals.append(p_mw)
@@ -151,7 +167,7 @@ def main():
     # Integrate per rail
     results: dict[str, dict] = {}
     for rail in rails:
-        samples_iter = iter_tegrastats_samples(args.tegrastats_log, rail)
+        samples_iter = iter_tegrastats_samples(args.tegrastats_log, rail, dt_s)
         results[rail] = integrate(samples_iter, intervals, dt_s)
 
     # Print summary and optional CSV

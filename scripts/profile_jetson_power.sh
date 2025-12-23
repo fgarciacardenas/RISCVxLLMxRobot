@@ -14,7 +14,7 @@ Usage:
 
 Options:
   --container NAME        Docker container name (default: embodiedai_dock)
-  --workdir PATH          Workdir inside container (default: /embodiedai/src/LLMxRobot)
+  --workdir PATH          Workdir inside container (default: /embodiedai)
   --cmd CMD               Command to run inside container (default: ./run_decision_tests_gpu_gguf.sh)
   --interval-ms MS        tegrastats interval in ms (default: 200)
   --baseline-s SEC        Baseline duration before workload (default: 10)
@@ -69,6 +69,7 @@ done
 
 command -v tegrastats >/dev/null 2>&1 || { echo "tegrastats not found on host PATH." >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "docker not found on host PATH." >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 not found on host PATH." >&2; exit 1; }
 
 if [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo false)" != "true" ]]; then
   echo "Container '$CONTAINER' is not running (or not found). Start it first, then retry." >&2
@@ -117,21 +118,25 @@ if command -v setsid >/dev/null 2>&1; then
   HAS_SETSID="1"
 fi
 
+HAS_TIMEOUT="0"
+if command -v timeout >/dev/null 2>&1; then
+  HAS_TIMEOUT="1"
+fi
+
 terminate_pid() {
   local pid="${1:-}"
   local label="${2:-process}"
   [[ -n "$pid" ]] || return 0
   kill -0 "$pid" >/dev/null 2>&1 || return 0
 
+  # Try process group kill first (when started via setsid), then direct PID kill.
   if [[ "$HAS_SETSID" == "1" ]]; then
-    # The pid should be a session leader; kill the whole group just in case.
     kill -TERM -- "-$pid" >/dev/null 2>&1 || true
-  else
-    kill -TERM "$pid" >/dev/null 2>&1 || true
   fi
+  kill -TERM "$pid" >/dev/null 2>&1 || true
 
   local deadline
-  deadline="$(awk -v now="$(date +%s)" -v t="$KILL_TIMEOUT_S" 'BEGIN{printf "%d", now + (t+0)}')"
+  deadline=$(( $(date +%s) + KILL_TIMEOUT_S ))
   while kill -0 "$pid" >/dev/null 2>&1; do
     if (( $(date +%s) >= deadline )); then
       break
@@ -143,9 +148,8 @@ terminate_pid() {
     echo "Force killing $label (pid=$pid)..." >&2
     if [[ "$HAS_SETSID" == "1" ]]; then
       kill -KILL -- "-$pid" >/dev/null 2>&1 || true
-    else
-      kill -KILL "$pid" >/dev/null 2>&1 || true
     fi
+    kill -KILL "$pid" >/dev/null 2>&1 || true
   fi
 }
 
@@ -169,9 +173,21 @@ fi
 
 CLEANED_UP="0"
 INTERRUPTED="0"
+PID_FILE_IN_CONTAINER=""
 cleanup() {
   [[ "$CLEANED_UP" == "1" ]] && return 0
   CLEANED_UP="1"
+
+  if [[ -n "$PID_FILE_IN_CONTAINER" ]]; then
+    # Best-effort: stop the in-container workload process (killing host-side `docker exec`
+    # alone may leave the workload running inside the container).
+    kill_cmd="if [ -f '$PID_FILE_IN_CONTAINER' ]; then pid=\$(cat '$PID_FILE_IN_CONTAINER' 2>/dev/null || true); if [ -n \"\$pid\" ]; then kill -TERM \"\$pid\" >/dev/null 2>&1 || true; sleep 0.3; kill -0 \"\$pid\" >/dev/null 2>&1 && kill -KILL \"\$pid\" >/dev/null 2>&1 || true; fi; fi"
+    if [[ "$HAS_TIMEOUT" == "1" ]]; then
+      timeout 3s docker exec -i "$CONTAINER" bash -lc "$kill_cmd" >/dev/null 2>&1 || true
+    else
+      docker exec -i "$CONTAINER" bash -lc "$kill_cmd" >/dev/null 2>&1 || true
+    fi
+  fi
 
   terminate_pid "${TAIL_PID:-}" "tail"
   terminate_pid "${WORKLOAD_PID:-}" "docker exec workload"
@@ -221,10 +237,11 @@ else
 
   # Run workload with a real PID we can stop, while still streaming logs.
   rm -f "$RUN_LOG"
+  PID_FILE_IN_CONTAINER="/tmp/llmxrobot_profile_${ts}.pid"
   if [[ "$HAS_SETSID" == "1" ]]; then
-    setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+    setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && ( $CMD ) & echo \$! > '$PID_FILE_IN_CONTAINER' ; wait \$!" >"$RUN_LOG" 2>&1 &
   else
-    docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+    docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && ( $CMD ) & echo \$! > '$PID_FILE_IN_CONTAINER' ; wait \$!" >"$RUN_LOG" 2>&1 &
   fi
   WORKLOAD_PID=$!
 
@@ -241,14 +258,21 @@ else
   set -e
 
   terminate_pid "$TAIL_PID" "tail"
+
+  # Cleanup PID file inside container (best-effort).
+  if [[ "$HAS_TIMEOUT" == "1" ]]; then
+    timeout 2s docker exec -i "$CONTAINER" bash -lc "rm -f '$PID_FILE_IN_CONTAINER'" >/dev/null 2>&1 || true
+  else
+    docker exec -i "$CONTAINER" bash -lc "rm -f '$PID_FILE_IN_CONTAINER'" >/dev/null 2>&1 || true
+  fi
 fi
 
 echo "Stopping tegrastats..."
 cleanup
 trap - EXIT INT TERM
 
-dt_s="$(awk -v ms="$INTERVAL_MS" 'BEGIN{printf "%.6f", ms/1000.0}')"
-baseline_samples="$(awk -v b="$BASELINE_S" -v dt="$dt_s" 'BEGIN{if(dt<=0){print 0; exit} printf "%d", int((b/dt)+0.5)}')"
+dt_s="$(python3 -c "print(f'{int($INTERVAL_MS)/1000.0:.6f}')")"
+baseline_samples="$(python3 -c "dt=float('$dt_s'); b=float('$BASELINE_S'); print(int(round(b/dt)) if dt>0 else 0)")"
 
 echo
 echo "Summary (dt=${dt_s}s, baseline_samples=${baseline_samples}):"
@@ -257,40 +281,11 @@ echo "  - 'run' excludes the baseline window"
 echo "  - 'delta_energy_J' subtracts baseline mean power from run window"
 echo
 
-IFS=',' read -r -a rails <<<"$RAILS_CSV"
-for rail in "${rails[@]}"; do
-  rail="$(echo "$rail" | xargs)"
-  [[ -n "$rail" ]] || continue
-  awk -v rail="$rail" -v dt="$dt_s" -v skip="$baseline_samples" '
-    BEGIN{
-      n=0; sum=0; max=0;
-      bn=0; bsum=0; bmax=0;
-      rn=0; rsum=0; rmax=0;
-    }
-    {
-      if (match($0, rail "[[:space:]]+([0-9]+)mW", m)) {
-        p = m[1] + 0;
-        n++; sum += p; if (p > max) max = p;
-        if (n <= skip) { bn++; bsum += p; if (p > bmax) bmax = p; }
-        else { rn++; rsum += p; if (p > rmax) rmax = p; }
-      }
-    }
-    END{
-      if (n == 0) { printf "%s: no samples found in tegrastats log\n", rail; exit 2; }
-      dur = n * dt;
-      printf "%s total: samples=%d dur_s=%.3f avg_mW=%.1f peak_mW=%d energy_J=%.3f\n",
-             rail, n, dur, (sum/n), max, (sum*dt)/1000.0;
-      if (skip > 0 && bn > 0) {
-        bavg = bsum / bn;
-        rdur = rn * dt;
-        ravg = (rn > 0) ? (rsum / rn) : 0;
-        deltaE = ((rsum - (bavg * rn)) * dt) / 1000.0;
-        printf "%s run:   samples=%d dur_s=%.3f avg_mW=%.1f peak_mW=%d energy_J=%.3f baseline_mW=%.1f delta_energy_J=%.3f\n",
-               rail, rn, rdur, ravg, rmax, (rsum*dt)/1000.0, bavg, deltaE;
-      }
-    }
-  ' "$TEGRA_LOG"
-done
+python3 scripts/summarize_tegrastats.py \
+  --tegrastats-log "$TEGRA_LOG" \
+  --interval-ms "$INTERVAL_MS" \
+  --baseline-samples "$baseline_samples" \
+  --rails "$RAILS_CSV" || true
 
 if [[ "$SEGMENT_LLM" == "1" ]]; then
   echo
