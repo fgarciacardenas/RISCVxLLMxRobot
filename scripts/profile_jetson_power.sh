@@ -239,9 +239,9 @@ else
   rm -f "$RUN_LOG"
   PID_FILE_IN_CONTAINER="/tmp/llmxrobot_profile_${ts}.pid"
   if [[ "$HAS_SETSID" == "1" ]]; then
-    setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && ( $CMD ) & echo \$! > '$PID_FILE_IN_CONTAINER' ; wait \$!" >"$RUN_LOG" 2>&1 &
+    setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" >"$RUN_LOG" 2>&1 &
   else
-    docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && ( $CMD ) & echo \$! > '$PID_FILE_IN_CONTAINER' ; wait \$!" >"$RUN_LOG" 2>&1 &
+    docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" >"$RUN_LOG" 2>&1 &
   fi
   WORKLOAD_PID=$!
 
