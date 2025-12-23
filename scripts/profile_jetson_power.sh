@@ -168,6 +168,7 @@ if [[ "$SEGMENT_LLM" == "1" ]]; then
 fi
 
 CLEANED_UP="0"
+INTERRUPTED="0"
 cleanup() {
   [[ "$CLEANED_UP" == "1" ]] && return 0
   CLEANED_UP="1"
@@ -190,8 +191,9 @@ cleanup() {
 on_interrupt() {
   echo
   echo "Interrupted; stopping workload + tegrastats..."
+  INTERRUPTED="1"
   cleanup
-  exit 130
+  # Do not exit here: allow the script to continue to the summary/CSV generation.
 }
 
 trap cleanup EXIT
@@ -208,33 +210,38 @@ TEGRA_PID=$!
 
 if [[ "$BASELINE_S" != "0" ]]; then
   echo "Baseline: ${BASELINE_S}s (keep system idle for best attribution)..."
-  sleep "$BASELINE_S"
+  sleep "$BASELINE_S" || true
 fi
 
-echo "Running workload in container '$CONTAINER'..."
-
-# Run workload with a real PID we can stop, while still streaming logs.
-rm -f "$RUN_LOG"
-if [[ "$HAS_SETSID" == "1" ]]; then
-  setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+if [[ "$INTERRUPTED" == "1" ]]; then
+  echo "Skipping workload (interrupted during baseline)."
+  WORKLOAD_EXIT=130
 else
-  docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+  echo "Running workload in container '$CONTAINER'..."
+
+  # Run workload with a real PID we can stop, while still streaming logs.
+  rm -f "$RUN_LOG"
+  if [[ "$HAS_SETSID" == "1" ]]; then
+    setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+  else
+    docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+  fi
+  WORKLOAD_PID=$!
+
+  if [[ "$HAS_SETSID" == "1" ]]; then
+    setsid tail -n +1 -f "$RUN_LOG" &
+  else
+    tail -n +1 -f "$RUN_LOG" &
+  fi
+  TAIL_PID=$!
+
+  set +e
+  wait "$WORKLOAD_PID"
+  WORKLOAD_EXIT=$?
+  set -e
+
+  terminate_pid "$TAIL_PID" "tail"
 fi
-WORKLOAD_PID=$!
-
-if [[ "$HAS_SETSID" == "1" ]]; then
-  setsid tail -n +1 -f "$RUN_LOG" &
-else
-  tail -n +1 -f "$RUN_LOG" &
-fi
-TAIL_PID=$!
-
-set +e
-wait "$WORKLOAD_PID"
-WORKLOAD_EXIT=$?
-set -e
-
-terminate_pid "$TAIL_PID" "tail"
 
 echo "Stopping tegrastats..."
 cleanup
@@ -302,4 +309,7 @@ if [[ "$SEGMENT_LLM" == "1" ]]; then
 fi
 
 echo
-exit "$WORKLOAD_EXIT"
+if [[ "$INTERRUPTED" == "1" ]]; then
+  echo "Exited early due to interrupt."
+fi
+exit "${WORKLOAD_EXIT:-130}"

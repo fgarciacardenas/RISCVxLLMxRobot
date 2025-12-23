@@ -62,7 +62,17 @@ def read_event_intervals(run_log: str, start_event: str, end_event: str, prefix:
                     intervals.append((start_t, end_t, start_payload or {}))
                 start_payload = None
                 start_t = None
-    return intervals
+    return intervals, start_t, (start_payload or {})
+
+
+def last_tegrastats_epoch(path: str) -> float | None:
+    last = None
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            ts = parse_tegrastats_time_to_epoch(line)
+            if ts is not None:
+                last = ts
+    return last
 
 
 def integrate(samples, intervals, dt_s: float):
@@ -114,7 +124,12 @@ def main():
 
     dt_s = args.interval_ms / 1000.0
     rails = [r.strip() for r in args.rails.split(",") if r.strip()]
-    intervals = read_event_intervals(args.run_log, args.start_event, args.end_event)
+    intervals, open_start_t, open_meta = read_event_intervals(args.run_log, args.start_event, args.end_event)
+    if open_start_t is not None:
+        # If interrupted mid-decode, approximate the end as the last tegrastats timestamp (or "now").
+        end_t = last_tegrastats_epoch(args.tegrastats_log) or time.time()
+        if end_t >= open_start_t:
+            intervals.append((open_start_t, end_t, open_meta))
     if not intervals:
         print("No event intervals found in run log; did you set LLMXROBOT_PROFILE_LLM=1?", file=sys.stderr)
         return 2
@@ -172,4 +187,3 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
