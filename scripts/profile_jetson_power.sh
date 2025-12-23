@@ -24,6 +24,7 @@ Options:
   --segment-llm           Also compute energy for LLM decode windows only (requires LLM marker events)
   --segment-start EVENT   Start event name (default: llm_decode_start)
   --segment-end EVENT     End event name (default: llm_decode_end)
+  --kill-timeout-s SEC    Seconds to wait before SIGKILL on stop (default: 5)
   -h, --help              Show this help
 
 Example:
@@ -42,6 +43,7 @@ SEGMENT_LLM="0"
 SEGMENT_START_EVENT="llm_decode_start"
 SEGMENT_END_EVENT="llm_decode_end"
 ENV_KVS=()
+KILL_TIMEOUT_S="5"
 
 WORKDIR_SET_BY_USER="0"
 CMD_SET_BY_USER="0"
@@ -59,6 +61,7 @@ while [[ $# -gt 0 ]]; do
     --segment-llm) SEGMENT_LLM="1"; shift 1 ;;
     --segment-start) SEGMENT_START_EVENT="${2:?}"; shift 2 ;;
     --segment-end) SEGMENT_END_EVENT="${2:?}"; shift 2 ;;
+    --kill-timeout-s) KILL_TIMEOUT_S="${2:?}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
   esac
@@ -109,6 +112,43 @@ ts="$(date +%Y%m%d_%H%M%S)"
 TEGRA_LOG="$LOG_DIR/tegrastats_${ts}.log"
 RUN_LOG="$LOG_DIR/workload_${ts}.log"
 
+HAS_SETSID="0"
+if command -v setsid >/dev/null 2>&1; then
+  HAS_SETSID="1"
+fi
+
+terminate_pid() {
+  local pid="${1:-}"
+  local label="${2:-process}"
+  [[ -n "$pid" ]] || return 0
+  kill -0 "$pid" >/dev/null 2>&1 || return 0
+
+  if [[ "$HAS_SETSID" == "1" ]]; then
+    # The pid should be a session leader; kill the whole group just in case.
+    kill -TERM -- "-$pid" >/dev/null 2>&1 || true
+  else
+    kill -TERM "$pid" >/dev/null 2>&1 || true
+  fi
+
+  local deadline
+  deadline="$(awk -v now="$(date +%s)" -v t="$KILL_TIMEOUT_S" 'BEGIN{printf "%d", now + (t+0)}')"
+  while kill -0 "$pid" >/dev/null 2>&1; do
+    if (( $(date +%s) >= deadline )); then
+      break
+    fi
+    sleep 0.2
+  done
+
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    echo "Force killing $label (pid=$pid)..." >&2
+    if [[ "$HAS_SETSID" == "1" ]]; then
+      kill -KILL -- "-$pid" >/dev/null 2>&1 || true
+    else
+      kill -KILL "$pid" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 ENV_ARGS=()
 for kv in "${ENV_KVS[@]}"; do
   ENV_ARGS+=(-e "$kv")
@@ -132,19 +172,8 @@ cleanup() {
   [[ "$CLEANED_UP" == "1" ]] && return 0
   CLEANED_UP="1"
 
-  if [[ -n "${WORKLOAD_PID:-}" ]] && kill -0 "$WORKLOAD_PID" 2>/dev/null; then
-    kill -TERM "$WORKLOAD_PID" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${TAIL_PID:-}" ]] && kill -0 "$TAIL_PID" 2>/dev/null; then
-    kill -TERM "$TAIL_PID" >/dev/null 2>&1 || true
-  fi
-
-  if [[ -n "${WORKLOAD_PID:-}" ]]; then
-    wait "$WORKLOAD_PID" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${TAIL_PID:-}" ]]; then
-    wait "$TAIL_PID" >/dev/null 2>&1 || true
-  fi
+  terminate_pid "${TAIL_PID:-}" "tail"
+  terminate_pid "${WORKLOAD_PID:-}" "docker exec workload"
 
   if [[ -n "${TEGRA_PID:-}" ]] && kill -0 "$TEGRA_PID" 2>/dev/null; then
     sudo kill -INT "$TEGRA_PID" >/dev/null 2>&1 || true
@@ -153,7 +182,8 @@ cleanup() {
     if [[ -n "$child_pid" ]]; then
       sudo kill -INT "$child_pid" >/dev/null 2>&1 || true
     fi
-    wait "$TEGRA_PID" >/dev/null 2>&1 || true
+    # Avoid hanging indefinitely if sudo/tegrastats ignores signals.
+    terminate_pid "$TEGRA_PID" "tegrastats"
   fi
 }
 
@@ -185,10 +215,18 @@ echo "Running workload in container '$CONTAINER'..."
 
 # Run workload with a real PID we can stop, while still streaming logs.
 rm -f "$RUN_LOG"
-docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+if [[ "$HAS_SETSID" == "1" ]]; then
+  setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+else
+  docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+fi
 WORKLOAD_PID=$!
 
-tail -n +1 -f "$RUN_LOG" &
+if [[ "$HAS_SETSID" == "1" ]]; then
+  setsid tail -n +1 -f "$RUN_LOG" &
+else
+  tail -n +1 -f "$RUN_LOG" &
+fi
 TAIL_PID=$!
 
 set +e
@@ -196,8 +234,7 @@ wait "$WORKLOAD_PID"
 WORKLOAD_EXIT=$?
 set -e
 
-kill -TERM "$TAIL_PID" >/dev/null 2>&1 || true
-wait "$TAIL_PID" >/dev/null 2>&1 || true
+terminate_pid "$TAIL_PID" "tail"
 
 echo "Stopping tegrastats..."
 cleanup
