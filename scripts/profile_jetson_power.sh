@@ -20,6 +20,10 @@ Options:
   --baseline-s SEC        Baseline duration before workload (default: 10)
   --rails A,B,C           Comma-separated rails to summarize (default: VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV)
   --log-dir PATH          Host log output dir (default: src/LLMxRobot/logs/power_profiles)
+  --env KEY=VAL           Pass env var into `docker exec` (repeatable)
+  --segment-llm           Also compute energy for LLM decode windows only (requires LLM marker events)
+  --segment-start EVENT   Start event name (default: llm_decode_start)
+  --segment-end EVENT     End event name (default: llm_decode_end)
   -h, --help              Show this help
 
 Example:
@@ -34,6 +38,10 @@ INTERVAL_MS="200"
 BASELINE_S="10"
 RAILS_CSV="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV"
 LOG_DIR="src/LLMxRobot/logs/power_profiles"
+SEGMENT_LLM="0"
+SEGMENT_START_EVENT="llm_decode_start"
+SEGMENT_END_EVENT="llm_decode_end"
+ENV_KVS=()
 
 WORKDIR_SET_BY_USER="0"
 CMD_SET_BY_USER="0"
@@ -47,6 +55,10 @@ while [[ $# -gt 0 ]]; do
     --baseline-s) BASELINE_S="${2:?}"; shift 2 ;;
     --rails) RAILS_CSV="${2:?}"; shift 2 ;;
     --log-dir) LOG_DIR="${2:?}"; shift 2 ;;
+    --env) ENV_KVS+=("${2:?}"); shift 2 ;;
+    --segment-llm) SEGMENT_LLM="1"; shift 1 ;;
+    --segment-start) SEGMENT_START_EVENT="${2:?}"; shift 2 ;;
+    --segment-end) SEGMENT_END_EVENT="${2:?}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
   esac
@@ -96,6 +108,24 @@ mkdir -p "$LOG_DIR"
 ts="$(date +%Y%m%d_%H%M%S)"
 TEGRA_LOG="$LOG_DIR/tegrastats_${ts}.log"
 RUN_LOG="$LOG_DIR/workload_${ts}.log"
+
+ENV_ARGS=()
+for kv in "${ENV_KVS[@]}"; do
+  ENV_ARGS+=(-e "$kv")
+done
+if [[ "$SEGMENT_LLM" == "1" ]]; then
+  # Ensure event markers are enabled unless the user explicitly set it.
+  has_marker_env="0"
+  for kv in "${ENV_KVS[@]}"; do
+    if [[ "$kv" == LLMXROBOT_PROFILE_LLM=* ]]; then
+      has_marker_env="1"
+      break
+    fi
+  done
+  if [[ "$has_marker_env" == "0" ]]; then
+    ENV_ARGS+=(-e "LLMXROBOT_PROFILE_LLM=1")
+  fi
+fi
 
 CLEANED_UP="0"
 cleanup() {
@@ -155,7 +185,7 @@ echo "Running workload in container '$CONTAINER'..."
 
 # Run workload with a real PID we can stop, while still streaming logs.
 rm -f "$RUN_LOG"
-docker exec -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
+docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && $CMD" >"$RUN_LOG" 2>&1 &
 WORKLOAD_PID=$!
 
 tail -n +1 -f "$RUN_LOG" &
@@ -217,6 +247,22 @@ for rail in "${rails[@]}"; do
     }
   ' "$TEGRA_LOG"
 done
+
+if [[ "$SEGMENT_LLM" == "1" ]]; then
+  echo
+  echo "LLM-only segment summary (from workload event markers):"
+  SEG_CSV="$LOG_DIR/llm_segments_${ts}.csv"
+  python3 scripts/summarize_tegrastats_segments.py \
+    --tegrastats-log "$TEGRA_LOG" \
+    --run-log "$RUN_LOG" \
+    --interval-ms "$INTERVAL_MS" \
+    --baseline-samples "$baseline_samples" \
+    --rails "$RAILS_CSV" \
+    --start-event "$SEGMENT_START_EVENT" \
+    --end-event "$SEGMENT_END_EVENT" \
+    --out-csv "$SEG_CSV" || true
+  echo "  segments_csv: $SEG_CSV"
+fi
 
 echo
 exit "$WORKLOAD_EXIT"
