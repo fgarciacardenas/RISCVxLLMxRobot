@@ -71,6 +71,12 @@ command -v tegrastats >/dev/null 2>&1 || { echo "tegrastats not found on host PA
 command -v docker >/dev/null 2>&1 || { echo "docker not found on host PATH." >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "python3 not found on host PATH." >&2; exit 1; }
 
+# tegrastats typically requires sudo; refresh credentials up front so we don't block mid-run.
+if ! sudo -n true >/dev/null 2>&1; then
+  echo "Sudo is required to run tegrastats; prompting once now..." >&2
+  sudo -v
+fi
+
 if [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo false)" != "true" ]]; then
   echo "Container '$CONTAINER' is not running (or not found). Start it first, then retry." >&2
   exit 1
@@ -295,10 +301,16 @@ else
   if [[ -z "$LOG_DIR_IN_CONTAINER" ]]; then
     echo "Could not map host --log-dir to a container path; falling back to streaming docker exec output." >&2
     PID_FILE_IN_CONTAINER="/tmp/llmxrobot_profile_${ts}.pid"
+    RUN_ENV_ARGS=(
+      "${ENV_ARGS[@]}"
+      -e "LLMX_WORKDIR=$WORKDIR"
+      -e "LLMX_CMD=$CMD"
+      -e "LLMX_PIDFILE=$PID_FILE_IN_CONTAINER"
+    )
     if [[ "$HAS_SETSID" == "1" ]]; then
-      setsid docker exec "${ENV_ARGS[@]}" "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" </dev/null >"$RUN_LOG" 2>&1 &
+      setsid docker exec "${RUN_ENV_ARGS[@]}" "$CONTAINER" bash -lc 'cd "$LLMX_WORKDIR" && echo $$ > "$LLMX_PIDFILE" && trap "kill 0" INT TERM HUP && eval "$LLMX_CMD"' </dev/null >"$RUN_LOG" 2>&1 &
     else
-      docker exec "${ENV_ARGS[@]}" "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" </dev/null >"$RUN_LOG" 2>&1 &
+      docker exec "${RUN_ENV_ARGS[@]}" "$CONTAINER" bash -lc 'cd "$LLMX_WORKDIR" && echo $$ > "$LLMX_PIDFILE" && trap "kill 0" INT TERM HUP && eval "$LLMX_CMD"' </dev/null >"$RUN_LOG" 2>&1 &
     fi
     WORKLOAD_PID=$!
 
@@ -322,9 +334,25 @@ else
     PID_FILE_IN_CONTAINER="$LOG_DIR_IN_CONTAINER/$(basename "$PID_FILE")"
 
     # Start detached workload.
-    docker exec "${ENV_ARGS[@]}" -d "$CONTAINER" bash -lc \
-      "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && ( $CMD ) > '$RUN_LOG_IN_CONTAINER' 2>&1 ; ec=\\$? ; echo \\$ec > '$EXIT_FILE_IN_CONTAINER' ; touch '$DONE_FILE_IN_CONTAINER' ; exit \\$ec" \
-      </dev/null >/dev/null 2>&1 || true
+    RUN_ENV_ARGS=(
+      "${ENV_ARGS[@]}"
+      -e "LLMX_WORKDIR=$WORKDIR"
+      -e "LLMX_CMD=$CMD"
+      -e "LLMX_RUNLOG=$RUN_LOG_IN_CONTAINER"
+      -e "LLMX_PIDFILE=$PID_FILE_IN_CONTAINER"
+      -e "LLMX_EXITFILE=$EXIT_FILE_IN_CONTAINER"
+      -e "LLMX_DONEFILE=$DONE_FILE_IN_CONTAINER"
+    )
+    docker exec "${RUN_ENV_ARGS[@]}" -d "$CONTAINER" bash -lc '
+      cd "$LLMX_WORKDIR" || exit 1
+      echo $$ > "$LLMX_PIDFILE"
+      trap "kill 0" INT TERM HUP
+      eval "$LLMX_CMD" > "$LLMX_RUNLOG" 2>&1
+      rc=$?
+      printf "%s\n" "$rc" > "$LLMX_EXITFILE"
+      touch "$LLMX_DONEFILE"
+      exit "$rc"
+    ' </dev/null >/dev/null 2>&1 || true
 
     # Stream logs from the host file as it grows.
     if [[ "$HAS_SETSID" == "1" ]]; then
