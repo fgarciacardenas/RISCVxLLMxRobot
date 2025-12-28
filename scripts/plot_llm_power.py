@@ -325,7 +325,7 @@ def main():
     ap.add_argument("--no-align", action="store_true", help="Disable auto alignment of tegrastats timestamps to decode event clock.")
     ap.add_argument("--clamp-delta", action="store_true", help="Clamp delta energy/power at 0 in per-test plots (visualization only).")
     ap.add_argument("--rails", default="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV", help="Rails to plot for energy-per-test.")
-    ap.add_argument("--trace-rail", default="VDD_CPU_CV", help="Single rail to plot for the full-run trace.")
+    ap.add_argument("--trace-rail", default="VDD_GPU_SOC", help="Single rail to plot for the full-run trace.")
     ap.add_argument("--outdir", default="plots", help="Output directory for images.")
     args = ap.parse_args()
 
