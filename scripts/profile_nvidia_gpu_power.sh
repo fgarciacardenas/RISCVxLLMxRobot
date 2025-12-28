@@ -119,7 +119,7 @@ emit_runlog_event() {
   local ev="${1:?}"; shift || true
   local extra="${1:-}"
   local now
-  now="$(python3 - <<'PY'\nimport time\nprint(f\"{time.time():.6f}\")\nPY\n)"
+  now="$(python3 -c 'import time; print(f"{time.time():.6f}")')"
   if [[ -n "$extra" ]]; then
     printf 'LLMXROBOT_EVENT {"event":"%s","t_epoch_s":%s,%s}\n' "$ev" "$now" "$extra" >>"$RUN_LOG"
   else

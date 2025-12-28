@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import csv
 import signal
 import subprocess
 import sys
 import time
+from typing import Callable, Optional
 
 
 STOP = False
@@ -15,7 +18,7 @@ def _on_sig(_sig, _frame):
     STOP = True
 
 
-def try_nvml_power(gpu_index: int) -> callable | None:
+def try_nvml_power(gpu_index: int) -> Optional[Callable[[], int]]:
     """
     Optional fast path via pynvml (if installed). Returns a callable that returns power_mW.
     """
@@ -97,4 +100,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

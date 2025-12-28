@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import datetime as dt
 import re
 import time
@@ -111,4 +113,3 @@ def weighted_mean_in_window(samples: Iterable[TegraSample], rail: str, t0: float
         num += float(s.rails_mw.get(rail, 0)) * overlap
         den += overlap
     return (num / den) if den > 0 else 0.0
-
