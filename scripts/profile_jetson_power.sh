@@ -18,6 +18,7 @@ Options:
   --cmd CMD               Command to run inside container (default: ./run_decision_tests_gpu_gguf.sh)
   --interval-ms MS        tegrastats interval in ms (default: 200)
   --baseline-s SEC        Baseline duration before workload (default: 10)
+  --baseline-estimator X  Baseline estimator for delta power/energy (mean|p10|p50|min; default: p10)
   --rails A,B,C           Comma-separated rails to summarize (default: VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV)
   --log-dir PATH          Host log output dir (default: src/LLMxRobot/logs/power_profiles)
   --env KEY=VAL           Pass env var into `docker exec` (repeatable)
@@ -37,6 +38,7 @@ WORKDIR="/embodiedai"
 CMD="./run_decision_tests_gpu_gguf.sh"
 INTERVAL_MS="200"
 BASELINE_S="10"
+BASELINE_ESTIMATOR="p10"
 RAILS_CSV="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV"
 LOG_DIR="src/LLMxRobot/logs/power_profiles"
 SEGMENT_LLM="0"
@@ -55,6 +57,7 @@ while [[ $# -gt 0 ]]; do
     --cmd) CMD="${2:?}"; CMD_SET_BY_USER="1"; shift 2 ;;
     --interval-ms) INTERVAL_MS="${2:?}"; shift 2 ;;
     --baseline-s) BASELINE_S="${2:?}"; shift 2 ;;
+    --baseline-estimator) BASELINE_ESTIMATOR="${2:?}"; shift 2 ;;
     --rails) RAILS_CSV="${2:?}"; shift 2 ;;
     --log-dir) LOG_DIR="${2:?}"; shift 2 ;;
     --env) ENV_KVS+=("${2:?}"); shift 2 ;;
@@ -137,6 +140,19 @@ mkdir -p "$LOG_DIR"
 ts="$(date +%Y%m%d_%H%M%S)"
 TEGRA_LOG="$LOG_DIR/tegrastats_${ts}.log"
 RUN_LOG="$LOG_DIR/workload_${ts}.log"
+: > "$RUN_LOG" || true
+
+emit_runlog_event() {
+  local ev="${1:?}"; shift || true
+  local extra="${1:-}"
+  local now
+  now="$(python3 - <<'PY'\nimport time\nprint(f\"{time.time():.6f}\")\nPY\n)"
+  if [[ -n "$extra" ]]; then
+    printf 'LLMXROBOT_EVENT {"event":"%s","t_epoch_s":%s,%s}\n' "$ev" "$now" "$extra" >>"$RUN_LOG"
+  else
+    printf 'LLMXROBOT_EVENT {"event":"%s","t_epoch_s":%s}\n' "$ev" "$now" >>"$RUN_LOG"
+  fi
+}
 
 HAS_SETSID="0"
 if command -v setsid >/dev/null 2>&1; then
@@ -276,6 +292,7 @@ echo
 echo "Starting tegrastats (${INTERVAL_MS}ms interval)..."
 sudo tegrastats --interval "$INTERVAL_MS" --logfile "$TEGRA_LOG" &
 TEGRA_PID=$!
+emit_runlog_event "power_profile_start" "\"baseline_s\":${BASELINE_S},\"interval_ms\":${INTERVAL_MS}"
 
 if [[ "$BASELINE_S" != "0" ]]; then
   echo "Baseline: ${BASELINE_S}s (keep system idle for best attribution)..."
@@ -287,11 +304,10 @@ if [[ "$INTERRUPTED" == "1" ]]; then
   WORKLOAD_EXIT=130
 else
   echo "Running workload in container '$CONTAINER'..."
+  emit_runlog_event "workload_start" "\"container\":\"${CONTAINER}\",\"workdir\":\"${WORKDIR}\""
 
   # Run workload detached inside the container, logging to the mounted filesystem.
   # This avoids `docker exec` sessions hanging after the in-container program finishes.
-  rm -f "$RUN_LOG"
-  : > "$RUN_LOG" || true
   DONE_FILE="$LOG_DIR/done_${ts}"
   EXIT_FILE="$LOG_DIR/exit_${ts}.txt"
   PID_FILE="$LOG_DIR/pid_${ts}.txt"
@@ -308,9 +324,9 @@ else
       -e "LLMX_PIDFILE=$PID_FILE_IN_CONTAINER"
     )
     if [[ "$HAS_SETSID" == "1" ]]; then
-      setsid docker exec "${RUN_ENV_ARGS[@]}" "$CONTAINER" bash -lc 'cd "$LLMX_WORKDIR" && echo $$ > "$LLMX_PIDFILE" && trap "kill 0" INT TERM HUP && eval "$LLMX_CMD"' </dev/null >"$RUN_LOG" 2>&1 &
+      setsid docker exec "${RUN_ENV_ARGS[@]}" "$CONTAINER" bash -lc 'cd "$LLMX_WORKDIR" && echo $$ > "$LLMX_PIDFILE" && trap "kill 0" INT TERM HUP && eval "$LLMX_CMD"' </dev/null >>"$RUN_LOG" 2>&1 &
     else
-      docker exec "${RUN_ENV_ARGS[@]}" "$CONTAINER" bash -lc 'cd "$LLMX_WORKDIR" && echo $$ > "$LLMX_PIDFILE" && trap "kill 0" INT TERM HUP && eval "$LLMX_CMD"' </dev/null >"$RUN_LOG" 2>&1 &
+      docker exec "${RUN_ENV_ARGS[@]}" "$CONTAINER" bash -lc 'cd "$LLMX_WORKDIR" && echo $$ > "$LLMX_PIDFILE" && trap "kill 0" INT TERM HUP && eval "$LLMX_CMD"' </dev/null >>"$RUN_LOG" 2>&1 &
     fi
     WORKLOAD_PID=$!
 
@@ -347,7 +363,7 @@ else
       cd "$LLMX_WORKDIR" || exit 1
       echo $$ > "$LLMX_PIDFILE"
       trap "kill 0" INT TERM HUP
-      eval "$LLMX_CMD" > "$LLMX_RUNLOG" 2>&1
+      eval "$LLMX_CMD" >> "$LLMX_RUNLOG" 2>&1
       rc=$?
       printf "%s\n" "$rc" > "$LLMX_EXITFILE"
       touch "$LLMX_DONEFILE"
@@ -379,25 +395,24 @@ else
     fi
   fi
 fi
+emit_runlog_event "workload_end" "\"exit_code\":${WORKLOAD_EXIT:-130},\"interrupted\":${INTERRUPTED}"
 
 echo "Stopping tegrastats..."
 cleanup
 trap - EXIT INT TERM
 
-dt_s="$(python3 -c "print(f'{int($INTERVAL_MS)/1000.0:.6f}')")"
-baseline_samples="$(python3 -c "dt=float('$dt_s'); b=float('$BASELINE_S'); print(int(round(b/dt)) if dt>0 else 0)")"
-
 echo
-echo "Summary (dt=${dt_s}s, baseline_samples=${baseline_samples}):"
+echo "Summary (baseline_s=${BASELINE_S}s, interval_ms=${INTERVAL_MS}, baseline_estimator=${BASELINE_ESTIMATOR}):"
 echo "  - 'total' uses all samples (baseline + run)"
 echo "  - 'run' excludes the baseline window"
-echo "  - 'delta_energy_J' subtracts baseline mean power from run window"
+echo "  - 'delta_energy_J' subtracts baseline power estimate from run window"
 echo
 
 python3 scripts/summarize_tegrastats.py \
   --tegrastats-log "$TEGRA_LOG" \
   --interval-ms "$INTERVAL_MS" \
-  --baseline-samples "$baseline_samples" \
+  --baseline-s "$BASELINE_S" \
+  --baseline-estimator "$BASELINE_ESTIMATOR" \
   --rails "$RAILS_CSV" || true
 
 if [[ "$SEGMENT_LLM" == "1" ]]; then
@@ -408,7 +423,8 @@ if [[ "$SEGMENT_LLM" == "1" ]]; then
     --tegrastats-log "$TEGRA_LOG" \
     --run-log "$RUN_LOG" \
     --interval-ms "$INTERVAL_MS" \
-    --baseline-samples "$baseline_samples" \
+    --baseline-s "$BASELINE_S" \
+    --baseline-estimator "$BASELINE_ESTIMATOR" \
     --rails "$RAILS_CSV" \
     --start-event "$SEGMENT_START_EVENT" \
     --end-event "$SEGMENT_END_EVENT" \

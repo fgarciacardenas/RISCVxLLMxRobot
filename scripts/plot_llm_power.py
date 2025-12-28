@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-import datetime as dt
 import json
 import math
 import os
 import re
-import time
 from dataclasses import dataclass
 
 # Headless plotting
@@ -15,41 +13,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-
-TEGRA_TS_RE = re.compile(r"^\s*(\d{2}-\d{2}-\d{4})\s+(\d{2}:\d{2}:\d{2})\s+")
-
-
-def parse_tegrastats_time_to_epoch(line: str) -> float | None:
-    m = TEGRA_TS_RE.match(line)
-    if not m:
-        return None
-    d, t = m.group(1), m.group(2)
-    try:
-        naive = dt.datetime.strptime(f"{d} {t}", "%m-%d-%Y %H:%M:%S")
-        return time.mktime(naive.timetuple())
-    except Exception:
-        return None
-
-
-def iter_tegrastats_samples(path: str, rail: str, dt_s: float):
-    rail_re = re.compile(rf"{re.escape(rail)}\s+(\d+)mW\b")
-    base_epoch = None
-    idx = -1
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            ts_wall = parse_tegrastats_time_to_epoch(line)
-            if ts_wall is None:
-                continue
-            if base_epoch is None:
-                base_epoch = ts_wall
-                idx = 0
-            else:
-                idx += 1
-            ts = float(base_epoch) + (idx * dt_s)
-            m = rail_re.search(line)
-            if not m:
-                continue
-            yield ts, int(m.group(1))
+try:
+    from tegrastats_utils import iter_tegrastats_samples
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.tegrastats_utils import iter_tegrastats_samples
 
 
 def read_llm_intervals(run_log: str, prefix: str = "LLMXROBOT_EVENT "):
@@ -93,6 +60,7 @@ class SegmentEnergy:
     dur_s: float
     energy_j: float
     delta_energy_j: float
+    baseline_mw: float | None
 
 
 def read_segments_csv(path: str) -> list[SegmentEnergy]:
@@ -106,14 +74,15 @@ def read_segments_csv(path: str) -> list[SegmentEnergy]:
                 dur = float(rec["dur_s"])
                 e = float(rec["energy_J"])
                 de = float(rec["delta_energy_J"])
+                bmw = float(rec["baseline_mW"]) if rec.get("baseline_mW") not in (None, "", "None") else None
             except Exception:
                 continue
             if math.isfinite(dur) and math.isfinite(e) and math.isfinite(de):
-                out.append(SegmentEnergy(idx=idx, rail=rail, dur_s=dur, energy_j=e, delta_energy_j=de))
+                out.append(SegmentEnergy(idx=idx, rail=rail, dur_s=dur, energy_j=e, delta_energy_j=de, baseline_mw=bmw))
     return out
 
 
-def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: list[str]):
+def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: list[str], clamp_delta: bool):
     by_rail: dict[str, list[SegmentEnergy]] = {}
     for s in segments:
         if rails and s.rail not in rails:
@@ -132,10 +101,11 @@ def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: lis
         rs_sorted = sorted(rs, key=lambda x: x.idx)
         xs = [r.idx for r in rs_sorted]
         y_abs = [r.energy_j for r in rs_sorted]
-        y_delta = [r.delta_energy_j for r in rs_sorted]
+        y_delta = [max(0.0, r.delta_energy_j) if clamp_delta else r.delta_energy_j for r in rs_sorted]
 
         ax.plot(xs, y_abs, color="#8aa1b1", linewidth=1.0, alpha=0.6, label="energy_J (abs)")
         ax.plot(xs, y_delta, color="#1f77b4", linewidth=1.5, marker="o", markersize=3, label="delta_energy_J (baseline-sub)")
+        ax.axhline(0.0, color="#999999", linestyle="--", linewidth=1.0, alpha=0.7)
         ax.set_ylabel("Energy (J)")
         ax.set_title(rail)
         ax.grid(True, alpha=0.25)
@@ -147,7 +117,7 @@ def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: lis
     plt.close(fig)
 
 
-def plot_power_per_test(segments: list[SegmentEnergy], outpath: str, rails: list[str]):
+def plot_power_per_test(segments: list[SegmentEnergy], outpath: str, rails: list[str], clamp_delta: bool):
     by_rail: dict[str, list[SegmentEnergy]] = {}
     for s in segments:
         if rails and s.rail not in rails:
@@ -170,10 +140,11 @@ def plot_power_per_test(segments: list[SegmentEnergy], outpath: str, rails: list
             return a / b if b and b > 0 else float("nan")
 
         p_abs_w = [_safe_div(r.energy_j, r.dur_s) for r in rs_sorted]
-        p_delta_w = [_safe_div(r.delta_energy_j, r.dur_s) for r in rs_sorted]
+        p_delta_w = [_safe_div(max(0.0, r.delta_energy_j) if clamp_delta else r.delta_energy_j, r.dur_s) for r in rs_sorted]
 
         ax.plot(xs, p_abs_w, color="#8aa1b1", linewidth=1.0, alpha=0.6, label="avg_power_W (abs)")
         ax.plot(xs, p_delta_w, color="#1f77b4", linewidth=1.5, marker="o", markersize=3, label="avg_delta_power_W (baseline-sub)")
+        ax.axhline(0.0, color="#999999", linestyle="--", linewidth=1.0, alpha=0.7)
         ax.set_ylabel("Power (W)")
         ax.set_title(rail)
         ax.grid(True, alpha=0.25)
@@ -192,15 +163,17 @@ def plot_power_with_markers(
     rail: str,
     interval_ms: int,
     baseline_s: float | None,
+    baseline_mw_override: float | None,
     align_to_events: bool,
 ):
-    dt_s = interval_ms / 1000.0
     # Load power samples
     ts = []
+    dts = []
     p = []
-    for t, mw in iter_tegrastats_samples(tegrastats_log, rail=rail, dt_s=dt_s):
-        ts.append(t)
-        p.append(mw)
+    for s in iter_tegrastats_samples(tegrastats_log, rails=[rail]):
+        ts.append(float(s.t_epoch_s))
+        dts.append(float(s.dt_s))
+        p.append(int(s.rails_mw.get(rail, 0)))
     if not ts:
         raise SystemExit(f"No tegrastats samples found for rail {rail}")
 
@@ -208,28 +181,46 @@ def plot_power_with_markers(
     if not intervals:
         raise SystemExit("No LLMXROBOT_EVENT decode intervals found in workload log.")
 
-    # Align tegrastats reconstructed timestamps to event clock.
-    # tegrastats logs time only to 1s resolution, so the reconstructed timeline can
-    # be shifted by up to ~1s. Apply a constant offset using the first decode start.
+    # Align tegrastats timestamps to event clock.
+    # tegrastats timestamps are only 1s resolution; apply a small constant offset
+    # by snapping the nearest tegrastats sample to the first decode start.
     shift_s = 0.0
     if align_to_events:
         first_start = min(s for s, _e, _m in intervals)
-        i0 = int(round((first_start - ts[0]) / dt_s))
-        i0 = max(0, min(i0, len(ts) - 1))
-        shift_s = first_start - (ts[0] + i0 * dt_s)
+        i0 = min(range(len(ts)), key=lambda i: abs(ts[i] - first_start))
+        shift_s = float(first_start) - float(ts[i0])
         if abs(shift_s) > 2.0:
             shift_s = 0.0
         ts = [t + shift_s for t in ts]
 
     # Infer baseline window: default is samples strictly before the first decode start.
     first_start = min(s for s, _e, _m in intervals)
-    if baseline_s is None:
-        baseline_mask = [t < first_start for t in ts]
+    if baseline_mw_override is not None and math.isfinite(baseline_mw_override):
+        baseline_mean = float(baseline_mw_override)
+        baseline_mode = "from_llm_segments_csv"
+        baseline_samples = 0
     else:
-        baseline_end = ts[0] + float(baseline_s)
-        baseline_mask = [t < baseline_end for t in ts]
-    baseline_vals = [mw for mw, is_b in zip(p, baseline_mask) if is_b]
-    baseline_mean = (sum(baseline_vals) / len(baseline_vals)) if baseline_vals else 0.0
+        if baseline_s is None:
+            baseline_end = float(first_start)
+            baseline_mode = "auto_pre_first_decode"
+        else:
+            baseline_end = float(ts[0]) + float(baseline_s)
+            baseline_mode = "fixed_seconds"
+
+        num = 0.0
+        den = 0.0
+        used = 0
+        for t, dt_s, mw in zip(ts, dts, p):
+            a = t
+            b = t + dt_s
+            overlap = max(0.0, min(b, baseline_end) - max(a, ts[0]))
+            if overlap <= 0:
+                continue
+            num += float(mw) * overlap
+            den += overlap
+            used += 1
+        baseline_mean = (num / den) if den > 0 else 0.0
+        baseline_samples = used
 
     # Plot: absolute power (W) + delta power (W) in two subplots with the same markers.
     fig, (ax0, ax1) = plt.subplots(nrows=2, ncols=1, figsize=(14, 7), sharex=True)
@@ -254,7 +245,12 @@ def plot_power_with_markers(
         ax1.axvline(xs, color="#1f77b4", alpha=0.25, linewidth=0.8)
         ax1.axvline(xe, color="#1f77b4", alpha=0.25, linewidth=0.8)
 
-    baseline_desc = "auto(pre-first-decode)" if baseline_s is None else f"{baseline_s:.0f}s"
+    if baseline_mode == "from_llm_segments_csv":
+        baseline_desc = "from llm_segments CSV"
+    elif baseline_s is None:
+        baseline_desc = "auto(pre-first-decode)"
+    else:
+        baseline_desc = f"{baseline_s:.0f}s"
     align_desc = f", align_shift_s={shift_s:.3f}" if align_to_events else ""
     ax0.set_title(f"Power ({rail}) with LLM decode windows (n={len(intervals)}), baseline={baseline_desc}{align_desc}")
     ax1.set_title("Delta power vs baseline (decode windows shaded)")
@@ -268,6 +264,33 @@ def plot_power_with_markers(
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
     plt.close(fig)
+    return {
+        "align_shift_s": shift_s,
+        "baseline_mean_mW": baseline_mean,
+        "baseline_samples": baseline_samples,
+        "baseline_mode": baseline_mode,
+    }
+
+
+def print_segment_baselines(segments: list[SegmentEnergy], rails: list[str]):
+    by_rail: dict[str, list[float]] = {}
+    neg_by_rail: dict[str, int] = {}
+    for s in segments:
+        if rails and s.rail not in rails:
+            continue
+        if s.baseline_mw is not None and math.isfinite(s.baseline_mw):
+            by_rail.setdefault(s.rail, []).append(s.baseline_mw)
+        if s.delta_energy_j < 0:
+            neg_by_rail[s.rail] = neg_by_rail.get(s.rail, 0) + 1
+    if by_rail:
+        print("Baselines from llm_segments CSV (baseline_mW):")
+        for rail, vals in sorted(by_rail.items()):
+            mean = sum(vals) / len(vals)
+            print(f"  {rail}: mean={mean:.1f} mW  min={min(vals):.1f}  max={max(vals):.1f}  n={len(vals)}")
+    if neg_by_rail:
+        print("Note: negative delta_energy_J rows (decode window below baseline mean) per rail:")
+        for rail, n in sorted(neg_by_rail.items()):
+            print(f"  {rail}: {n}")
 
 
 def main():
@@ -279,6 +302,7 @@ def main():
     ap.add_argument("--interval-ms", type=int, default=100)
     ap.add_argument("--baseline-s", default="auto", help="Baseline duration in seconds, or 'auto' (default: auto = all samples before first decode).")
     ap.add_argument("--no-align", action="store_true", help="Disable auto alignment of tegrastats timestamps to decode event clock.")
+    ap.add_argument("--clamp-delta", action="store_true", help="Clamp delta energy/power at 0 in per-test plots (visualization only).")
     ap.add_argument("--rails", default="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV", help="Rails to plot for energy-per-test.")
     ap.add_argument("--trace-rail", default="VIN_SYS_5V0", help="Single rail to plot for the full-run trace.")
     ap.add_argument("--outdir", default="plots", help="Output directory for images.")
@@ -314,10 +338,10 @@ def main():
 
     segments = read_segments_csv(seg)
     energy_plot = os.path.join(args.outdir, "energy_per_test.png")
-    plot_energy_per_test(segments, outpath=energy_plot, rails=rails)
+    plot_energy_per_test(segments, outpath=energy_plot, rails=rails, clamp_delta=args.clamp_delta)
 
     power_plot = os.path.join(args.outdir, "power_per_test.png")
-    plot_power_per_test(segments, outpath=power_plot, rails=rails)
+    plot_power_per_test(segments, outpath=power_plot, rails=rails, clamp_delta=args.clamp_delta)
 
     trace_plot = os.path.join(args.outdir, "power_trace_with_decode_windows.png")
     baseline_s: float | None
@@ -325,14 +349,27 @@ def main():
         baseline_s = None
     else:
         baseline_s = float(args.baseline_s)
-    plot_power_with_markers(
+    baseline_override_mw: float | None = None
+    if segments:
+        bs = [s.baseline_mw for s in segments if s.rail == args.trace_rail and s.baseline_mw is not None and math.isfinite(s.baseline_mw)]
+        if bs:
+            baseline_override_mw = sum(bs) / len(bs)
+
+    trace_meta = plot_power_with_markers(
         tegrastats_log=teg,
         run_log=run,
         outpath=trace_plot,
         rail=args.trace_rail,
         interval_ms=args.interval_ms,
         baseline_s=baseline_s,
+        baseline_mw_override=baseline_override_mw,
         align_to_events=not args.no_align,
+    )
+
+    print_segment_baselines(segments, rails=rails)
+    print(
+        f"Trace baseline ({args.trace_rail}): mean={trace_meta['baseline_mean_mW']/1000.0:.3f} W "
+        f"(samples={trace_meta['baseline_samples']}, mode={trace_meta['baseline_mode']}, align_shift_s={trace_meta['align_shift_s']:.3f})"
     )
 
     print("wrote:")
