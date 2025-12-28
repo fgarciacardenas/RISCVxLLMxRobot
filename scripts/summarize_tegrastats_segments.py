@@ -67,7 +67,10 @@ def read_event_intervals(run_log: str, start_event: str, end_event: str, prefix:
             elif ev == end_event and start_t is not None:
                 end_t = float(t)
                 if end_t >= start_t:
-                    intervals.append((start_t, end_t, start_payload or {}))
+                    meta = dict(start_payload or {})
+                    # Attach end-of-interval fields too (e.g., token counts).
+                    meta.update({f"end_{k}": v for k, v in payload.items() if k not in ("event",)})
+                    intervals.append((start_t, end_t, meta))
                 start_payload = None
                 start_t = None
     return intervals, start_t, (start_payload or {})
@@ -174,14 +177,44 @@ def main():
     if args.out_csv:
         with open(args.out_csv, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["idx", "start_epoch_s", "end_epoch_s", "dur_s", "rail", "energy_J", "delta_energy_J", "baseline_mW"])
-            for idx, (s, e, _meta) in enumerate(intervals):
+            w.writerow([
+                "idx",
+                "start_epoch_s",
+                "end_epoch_s",
+                "dur_s",
+                "rail",
+                "energy_J",
+                "delta_energy_J",
+                "baseline_mW",
+                "prompt_chars",
+                "prompt_tokens",
+                "completion_tokens",
+                "max_tokens",
+            ])
+            for idx, (s, e, meta) in enumerate(intervals):
                 dur = e - s
+                prompt_chars = meta.get("prompt_chars")
+                prompt_tokens = meta.get("end_prompt_tokens")
+                completion_tokens = meta.get("end_completion_tokens")
+                max_tokens = meta.get("max_tokens")
                 for rail in rails:
                     e_j = results[rail]["interval_mw_s"][idx] / 1000.0
                     b = baseline_mean_mw.get(rail, 0.0)
                     delta_j = (results[rail]["interval_mw_s"][idx] - (b * dur)) / 1000.0
-                    w.writerow([idx, f"{s:.6f}", f"{e:.6f}", f"{dur:.6f}", rail, f"{e_j:.6f}", f"{delta_j:.6f}", f"{b:.3f}"])
+                    w.writerow([
+                        idx,
+                        f"{s:.6f}",
+                        f"{e:.6f}",
+                        f"{dur:.6f}",
+                        rail,
+                        f"{e_j:.6f}",
+                        f"{delta_j:.6f}",
+                        f"{b:.3f}",
+                        prompt_chars,
+                        prompt_tokens,
+                        completion_tokens,
+                        max_tokens,
+                    ])
 
     print(f"Intervals: {len(intervals)}  dt_s={dt_s:.3f}")
     for rail in rails:

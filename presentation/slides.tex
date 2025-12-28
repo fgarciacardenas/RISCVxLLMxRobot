@@ -68,6 +68,52 @@
   \end{itemize}
 \end{frame}
 
+\begin{frame}{What is an ADS? (Autonomous Driving System)}
+  \begin{itemize}
+    \item An ADS is the full stack that turns \textbf{sensor inputs} (e.g., cameras/LiDAR/IMU) into \textbf{safe driving behavior}.
+    \item Typical modules: perception $\rightarrow$ localization $\rightarrow$ prediction $\rightarrow$ planning $\rightarrow$ control.
+    \item Key requirements: \textbf{safety}, \textbf{reliability}, \textbf{low latency}, and \textbf{robustness to edge cases}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Why on-board? Why knowledge-driven?}
+  \begin{itemize}
+    \item \textbf{Autonomy implies on-board compute:} cloud calls add latency, reduce availability (coverage), and complicate safety guarantees.
+    \item \textbf{Energy and memory are constrained} on embedded platforms; token generation directly impacts compute/energy.
+    \item \textbf{Knowledge-driven reasoning complements data-driven policies:}
+      \begin{itemize}
+        \item adds human-interpretable rules/intent (e.g., “keep a safe distance”),
+        \item improves generalization without requiring more training data for rare cases,
+        \item can inject domain hints via on-board RAG without external connectivity.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Related work I: on-board LLMs for ADS (Baumann et al., 2025)}
+  \begin{itemize}
+    \item \textbf{Core idea:} hybrid MPC+LLM architecture where the LLM operates at the \textbf{reasoning/intent layer} and MPC enforces feasibility.
+    \item \textbf{DecisionxLLM:} classify whether recent driving behavior adheres to a language intent from short state histories.
+    \item \textbf{RAG:} retrieve compact domain hints to improve decision quality without increasing model size.
+    \item \textbf{Embedded focus:} emphasize on-board deployment constraints (latency/memory/energy) and quantized inference.
+  \end{itemize}
+  \vspace{0.5em}
+  \footnotesize
+  Nicolas Baumann et al., “Enhancing Autonomous Driving Systems with On-Board Deployed Large Language Models”, arXiv:2504.11514.\\
+  \href{https://arxiv.org/abs/2504.11514}{https://arxiv.org/abs/2504.11514}
+\end{frame}
+
+\begin{frame}{Related work II: RobotxR1 (Boyle et al., 2025)}
+  \begin{itemize}
+    \item \textbf{Goal:} enable embodied robotic intelligence on compact LLMs through \textbf{closed-loop reinforcement learning}.
+    \item \textbf{RLVR framing:} train models with \textbf{verifiable rewards} (e.g., formatting + correctness of structured outputs).
+    \item \textbf{Relevance here:} motivates \textbf{binary decision heads} (verifiable, parseable) and robust formatting as a training target.
+  \end{itemize}
+  \vspace{0.5em}
+  \footnotesize
+  Liam Boyle et al., “RobotxR1: Enabling Embodied Robotic Intelligence on Large Language Models through Closed-Loop Reinforcement Learning”, arXiv:2505.03238.\\
+  \href{https://arxiv.org/abs/2505.03238}{https://arxiv.org/abs/2505.03238}
+\end{frame}
+
 \begin{frame}{Goal \& scope}
   \begin{itemize}
     \item Port DecisionxLLM-style decision classification to Axelera Metis (INT8, vendor compiler/runtime).
@@ -177,9 +223,11 @@
     Phi3 & BGE & 100.00\% & 77.86 | 77.86\% & 160 \\
     \midrule
     Llama3.2 & \xmark & 98.22\% & 70.75 | 72.10\% & 120 \\
+    Llama3.2 & OpenAI & 97.21\% & 66.24 | 68.52\% & 124 \\
     Llama3.2 & BGE & \cellcolor{ragColor}86.42\% & 69.54 | \textbf{80.58\%} & \cellcolor{outputColor}227 \\
     \midrule
     Qwen2.5 (7B) & \xmark & 100.00\% & 81.35 | 81.35\% & 109 \\
+    Qwen2.5 (7B) & OpenAI & 100.00\% & 84.33 | 84.33\% & 129 \\
     Qwen2.5 (7B) & BGE & 100.00\% & \textbf{86.55 | 86.55\%} & 124 \\
     \bottomrule
   \end{tabular}
@@ -270,21 +318,23 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{GGUF quantization (Q4.M, \texttt{llama.cpp})}
+\begin{frame}{GGUF quantization (Q4.M vs Q5.M, \texttt{llama.cpp})}
   \scriptsize
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.15}
   \begin{tabular}{lcccccc}
     \toprule
-    \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{GGUF quantization (Q4.M) vs GPU FP16}} \\
+    \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{GGUF quantization (Q4.M/Q5.M) vs GPU FP16}} \\
     \midrule
     \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Device}\\\textbf{used}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
     \midrule
     Phi3 & 3.80 B & BGE & GPU (FP16) & 100.00\% & \hphantom{}77.86 | 77.86\hphantom{}\% & \hphantom{}160 | 160\hphantom{} \\
     Phi3 & 3.80 B & BGE & GGUF (Q4.M) & 99.81\% & \hphantom{}71.95 | 72.06\hphantom{}\% & \hphantom{0}63 | 63\hphantom{0} \\
+    Phi3 & 3.80 B & BGE & GGUF (Q5.M) & 100.00\% & \hphantom{}81.73 | 81.73\hphantom{}\% & \hphantom{}174 | 174\hphantom{} \\
     \addlinespace
     Llama3.2 & 3.21 B & \xmark & GPU (FP16) & 98.22\% & \hphantom{}70.75 | 72.10\hphantom{}\% & \hphantom{}120 | 113\hphantom{} \\
     Llama3.2 & 3.21 B & \xmark & GGUF (Q4.M) & 99.49\% & \hphantom{}66.43 | 66.78\hphantom{}\% & \hphantom{}185 | 184\hphantom{} \\
+    Llama3.2 & 3.21 B & \xmark & GGUF (Q5.M) & 99.11\% & \hphantom{}66.94 | 67.61\hphantom{}\% & \hphantom{}104 | 101\hphantom{} \\
     \bottomrule
   \end{tabular}
 \vspace{0.7em}
@@ -307,14 +357,15 @@
     \toprule
     \multicolumn{7}{c}{\cellcolor{axeleraColor} \textbf{Axelera Metis INT8 vs GPU baseline}} \\
     \midrule
-    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \makecell{\textbf{Model}} & \makecell{\textbf{Device}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
     \midrule
-    Phi3 & 3.80 B & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
-    Phi3 & 3.80 B & \xmark & \xmark & 97.02\% & \hphantom{}55.84 | 57.54\hphantom{}\% & \hphantom{}223 | 221\hphantom{} \\
-    Phi3 & 3.80 B & \xmark & \cmark & 98.41\% & \hphantom{}66.12 | 67.09\hphantom{}\% & \hphantom{00}9 | 7\hphantom{00} \\
+    Phi3 (3.8B) & GPU (FP16) & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
+    Phi3 (3.8B) & Axelera (INT8) & \xmark & \xmark & 97.02\% & \hphantom{}55.84 | 57.54\hphantom{}\% & \hphantom{}223 | 221\hphantom{} \\
+    Phi3 (3.8B) & Axelera (INT8) & \xmark & \cmark & 98.41\% & \hphantom{}66.12 | 67.09\hphantom{}\% & \hphantom{00}9 | 7\hphantom{00} \\
     \addlinespace
-    Llama3.2 & 3.21 B & BGE & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
-    Llama3.2 & 3.21 B & BGE & \xmark & 49.62\% & \hphantom{}34.33 | 67.62\hphantom{}\% & \hphantom{}188 | 179\hphantom{} \\
+    Llama3.2 (3.2B) & GPU (FP16) & BGE & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
+    Llama3.2 (3.2B) & Axelera (INT8) & BGE & \xmark & 49.62\% & \hphantom{}34.33 | 67.62\hphantom{}\% & \hphantom{}188 | 179\hphantom{} \\
+    Llama3.2 (3.2B) & Axelera (INT8) & BGE & \cmark & 100.00\% & \hphantom{}52.98 | 52.98\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
     \bottomrule
   \end{tabular}
 \vspace{0.7em}
@@ -349,7 +400,15 @@
 \footnotesize{Takeaway: SFT maintains strong accuracy while improving verbosity/formatting; in binary mode it reliably emits a short decision.}
 \end{frame}
 
-\begin{frame}{Takeaways \& next steps}
+\begin{frame}{Conclusion: problem context}
+  \begin{itemize}
+    \item \textbf{Goal:} enable knowledge-driven, language-conditioned decision-making in an ADS-like stack \textbf{fully on-board}.
+    \item \textbf{Constraint:} no reliance on remote computation; embedded platforms have tight \textbf{latency, memory, and energy} budgets.
+    \item \textbf{Question:} can we keep decision quality while porting the workload to heterogeneous backends (GPU, GGUF, Axelera INT8)?
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion: findings \& next steps}
   \begin{itemize}
     \item On-board RAG (BGE) can recover much of cloud RAG’s benefit while remaining self-contained.
     \item Binary decision heads + early stopping are a high-leverage knob for embedded latency/energy.

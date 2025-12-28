@@ -78,12 +78,31 @@ fi
 
 container_has_dir() {
   local dir="$1"
-  docker exec -i "$CONTAINER" bash -lc "test -d '$dir'" >/dev/null 2>&1
+  docker exec "$CONTAINER" bash -lc "test -d '$dir'" >/dev/null 2>&1
 }
 
 container_has_file() {
   local path="$1"
-  docker exec -i "$CONTAINER" bash -lc "test -f '$path'" >/dev/null 2>&1
+  docker exec "$CONTAINER" bash -lc "test -f '$path'" >/dev/null 2>&1
+}
+
+container_log_dir_from_host() {
+  # Best-effort mapping for the Jetson setup where host `src/LLMxRobot` is mounted at `/embodiedai`.
+  # Returns empty string if we can't confidently map.
+  if ! container_has_dir "/embodiedai"; then
+    return 0
+  fi
+  case "$LOG_DIR" in
+    src/LLMxRobot/*)
+      echo "/embodiedai/${LOG_DIR#src/LLMxRobot/}"
+      ;;
+    logs/*)
+      echo "/embodiedai/$LOG_DIR"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
 }
 
 if [[ "$WORKDIR_SET_BY_USER" == "1" ]]; then
@@ -157,17 +176,45 @@ ENV_ARGS=()
 for kv in "${ENV_KVS[@]}"; do
   ENV_ARGS+=(-e "$kv")
 done
+
+# Avoid PermissionErrors / root-owned __pycache__ issues and ensure prompt-by-prompt progress
+# is visible immediately in the host log.
+has_no_pyc_env="0"
+has_unbuffered_env="0"
+for kv in "${ENV_KVS[@]}"; do
+  if [[ "$kv" == PYTHONDONTWRITEBYTECODE=* ]]; then
+    has_no_pyc_env="1"
+  fi
+  if [[ "$kv" == PYTHONUNBUFFERED=* ]]; then
+    has_unbuffered_env="1"
+  fi
+done
+if [[ "$has_no_pyc_env" == "0" ]]; then
+  ENV_ARGS+=(-e "PYTHONDONTWRITEBYTECODE=1")
+fi
+if [[ "$has_unbuffered_env" == "0" ]]; then
+  ENV_ARGS+=(-e "PYTHONUNBUFFERED=1")
+fi
+
 if [[ "$SEGMENT_LLM" == "1" ]]; then
   # Ensure event markers are enabled unless the user explicitly set it.
   has_marker_env="0"
+  has_hard_exit_env="0"
   for kv in "${ENV_KVS[@]}"; do
     if [[ "$kv" == LLMXROBOT_PROFILE_LLM=* ]]; then
       has_marker_env="1"
-      break
+    fi
+    if [[ "$kv" == LLMXROBOT_HARD_EXIT=* ]]; then
+      has_hard_exit_env="1"
     fi
   done
   if [[ "$has_marker_env" == "0" ]]; then
     ENV_ARGS+=(-e "LLMXROBOT_PROFILE_LLM=1")
+  fi
+  # On some Jetson/llama-cpp builds, Python can abort during interpreter shutdown.
+  # Hard-exit avoids that so profiling still completes and CSVs are written.
+  if [[ "$has_hard_exit_env" == "0" ]]; then
+    ENV_ARGS+=(-e "LLMXROBOT_HARD_EXIT=1")
   fi
 fi
 
@@ -181,11 +228,11 @@ cleanup() {
   if [[ -n "$PID_FILE_IN_CONTAINER" ]]; then
     # Best-effort: stop the in-container workload process (killing host-side `docker exec`
     # alone may leave the workload running inside the container).
-    kill_cmd="if [ -f '$PID_FILE_IN_CONTAINER' ]; then pid=\$(cat '$PID_FILE_IN_CONTAINER' 2>/dev/null || true); if [ -n \"\$pid\" ]; then kill -TERM \"\$pid\" >/dev/null 2>&1 || true; sleep 0.3; kill -0 \"\$pid\" >/dev/null 2>&1 && kill -KILL \"\$pid\" >/dev/null 2>&1 || true; fi; fi"
+    kill_cmd="if [ -f '$PID_FILE_IN_CONTAINER' ]; then pid=\$(cat '$PID_FILE_IN_CONTAINER' 2>/dev/null || true); if [ -n \"\$pid\" ]; then kill -TERM -- -\"\$pid\" >/dev/null 2>&1 || kill -TERM \"\$pid\" >/dev/null 2>&1 || true; sleep 0.5; kill -0 \"\$pid\" >/dev/null 2>&1 && kill -KILL -- -\"\$pid\" >/dev/null 2>&1 || kill -KILL \"\$pid\" >/dev/null 2>&1 || true; fi; fi"
     if [[ "$HAS_TIMEOUT" == "1" ]]; then
-      timeout 3s docker exec -i "$CONTAINER" bash -lc "$kill_cmd" >/dev/null 2>&1 || true
+      timeout 3s docker exec "$CONTAINER" bash -lc "$kill_cmd" </dev/null >/dev/null 2>&1 || true
     else
-      docker exec -i "$CONTAINER" bash -lc "$kill_cmd" >/dev/null 2>&1 || true
+      docker exec "$CONTAINER" bash -lc "$kill_cmd" </dev/null >/dev/null 2>&1 || true
     fi
   fi
 
@@ -235,35 +282,73 @@ if [[ "$INTERRUPTED" == "1" ]]; then
 else
   echo "Running workload in container '$CONTAINER'..."
 
-  # Run workload with a real PID we can stop, while still streaming logs.
+  # Run workload detached inside the container, logging to the mounted filesystem.
+  # This avoids `docker exec` sessions hanging after the in-container program finishes.
   rm -f "$RUN_LOG"
-  PID_FILE_IN_CONTAINER="/tmp/llmxrobot_profile_${ts}.pid"
-  if [[ "$HAS_SETSID" == "1" ]]; then
-    setsid docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" >"$RUN_LOG" 2>&1 &
+  : > "$RUN_LOG" || true
+  DONE_FILE="$LOG_DIR/done_${ts}"
+  EXIT_FILE="$LOG_DIR/exit_${ts}.txt"
+  PID_FILE="$LOG_DIR/pid_${ts}.txt"
+  rm -f "$DONE_FILE" "$EXIT_FILE" "$PID_FILE"
+
+  LOG_DIR_IN_CONTAINER="$(container_log_dir_from_host)"
+  if [[ -z "$LOG_DIR_IN_CONTAINER" ]]; then
+    echo "Could not map host --log-dir to a container path; falling back to streaming docker exec output." >&2
+    PID_FILE_IN_CONTAINER="/tmp/llmxrobot_profile_${ts}.pid"
+    if [[ "$HAS_SETSID" == "1" ]]; then
+      setsid docker exec "${ENV_ARGS[@]}" "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" </dev/null >"$RUN_LOG" 2>&1 &
+    else
+      docker exec "${ENV_ARGS[@]}" "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" </dev/null >"$RUN_LOG" 2>&1 &
+    fi
+    WORKLOAD_PID=$!
+
+    if [[ "$HAS_SETSID" == "1" ]]; then
+      setsid tail -n +1 -f "$RUN_LOG" &
+    else
+      tail -n +1 -f "$RUN_LOG" &
+    fi
+    TAIL_PID=$!
+
+    set +e
+    wait "$WORKLOAD_PID"
+    WORKLOAD_EXIT=$?
+    set -e
+
+    terminate_pid "$TAIL_PID" "tail"
   else
-    docker exec "${ENV_ARGS[@]}" -i "$CONTAINER" bash -lc "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && $CMD" >"$RUN_LOG" 2>&1 &
-  fi
-  WORKLOAD_PID=$!
+    RUN_LOG_IN_CONTAINER="$LOG_DIR_IN_CONTAINER/$(basename "$RUN_LOG")"
+    DONE_FILE_IN_CONTAINER="$LOG_DIR_IN_CONTAINER/$(basename "$DONE_FILE")"
+    EXIT_FILE_IN_CONTAINER="$LOG_DIR_IN_CONTAINER/$(basename "$EXIT_FILE")"
+    PID_FILE_IN_CONTAINER="$LOG_DIR_IN_CONTAINER/$(basename "$PID_FILE")"
 
-  if [[ "$HAS_SETSID" == "1" ]]; then
-    setsid tail -n +1 -f "$RUN_LOG" &
-  else
-    tail -n +1 -f "$RUN_LOG" &
-  fi
-  TAIL_PID=$!
+    # Start detached workload.
+    docker exec "${ENV_ARGS[@]}" -d "$CONTAINER" bash -lc \
+      "cd '$WORKDIR' && echo \\$\\$ > '$PID_FILE_IN_CONTAINER' && trap 'kill 0' INT TERM HUP && ( $CMD ) > '$RUN_LOG_IN_CONTAINER' 2>&1 ; ec=\\$? ; echo \\$ec > '$EXIT_FILE_IN_CONTAINER' ; touch '$DONE_FILE_IN_CONTAINER' ; exit \\$ec" \
+      </dev/null >/dev/null 2>&1 || true
 
-  set +e
-  wait "$WORKLOAD_PID"
-  WORKLOAD_EXIT=$?
-  set -e
+    # Stream logs from the host file as it grows.
+    if [[ "$HAS_SETSID" == "1" ]]; then
+      setsid tail -n +1 -f "$RUN_LOG" &
+    else
+      tail -n +1 -f "$RUN_LOG" &
+    fi
+    TAIL_PID=$!
 
-  terminate_pid "$TAIL_PID" "tail"
+    # Wait for completion marker (or interrupt).
+    while [[ ! -f "$DONE_FILE" ]]; do
+      if [[ "$INTERRUPTED" == "1" ]]; then
+        break
+      fi
+      sleep 0.2
+    done
 
-  # Cleanup PID file inside container (best-effort).
-  if [[ "$HAS_TIMEOUT" == "1" ]]; then
-    timeout 2s docker exec -i "$CONTAINER" bash -lc "rm -f '$PID_FILE_IN_CONTAINER'" >/dev/null 2>&1 || true
-  else
-    docker exec -i "$CONTAINER" bash -lc "rm -f '$PID_FILE_IN_CONTAINER'" >/dev/null 2>&1 || true
+    terminate_pid "$TAIL_PID" "tail"
+
+    if [[ -f "$EXIT_FILE" ]]; then
+      WORKLOAD_EXIT="$(cat "$EXIT_FILE" 2>/dev/null | tail -n 1 || true)"
+    else
+      WORKLOAD_EXIT=130
+    fi
   fi
 fi
 
