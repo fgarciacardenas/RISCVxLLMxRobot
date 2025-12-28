@@ -147,13 +147,52 @@ def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: lis
     plt.close(fig)
 
 
+def plot_power_per_test(segments: list[SegmentEnergy], outpath: str, rails: list[str]):
+    by_rail: dict[str, list[SegmentEnergy]] = {}
+    for s in segments:
+        if rails and s.rail not in rails:
+            continue
+        by_rail.setdefault(s.rail, []).append(s)
+
+    if not by_rail:
+        raise SystemExit("No segment rows found for requested rails.")
+
+    nrows = len(by_rail)
+    fig, axes = plt.subplots(nrows=nrows, ncols=1, figsize=(12, 3.2 * nrows), sharex=True)
+    if nrows == 1:
+        axes = [axes]
+
+    for ax, (rail, rs) in zip(axes, sorted(by_rail.items())):
+        rs_sorted = sorted(rs, key=lambda x: x.idx)
+        xs = [r.idx for r in rs_sorted]
+
+        def _safe_div(a: float, b: float) -> float:
+            return a / b if b and b > 0 else float("nan")
+
+        p_abs_w = [_safe_div(r.energy_j, r.dur_s) for r in rs_sorted]
+        p_delta_w = [_safe_div(r.delta_energy_j, r.dur_s) for r in rs_sorted]
+
+        ax.plot(xs, p_abs_w, color="#8aa1b1", linewidth=1.0, alpha=0.6, label="avg_power_W (abs)")
+        ax.plot(xs, p_delta_w, color="#1f77b4", linewidth=1.5, marker="o", markersize=3, label="avg_delta_power_W (baseline-sub)")
+        ax.set_ylabel("Power (W)")
+        ax.set_title(rail)
+        ax.grid(True, alpha=0.25)
+        ax.legend(loc="upper right", fontsize=9)
+
+    axes[-1].set_xlabel("Decode window idx")
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=160)
+    plt.close(fig)
+
+
 def plot_power_with_markers(
     tegrastats_log: str,
     run_log: str,
     outpath: str,
     rail: str,
     interval_ms: int,
-    baseline_s: float,
+    baseline_s: float | None,
+    align_to_events: bool,
 ):
     dt_s = interval_ms / 1000.0
     # Load power samples
@@ -165,36 +204,67 @@ def plot_power_with_markers(
     if not ts:
         raise SystemExit(f"No tegrastats samples found for rail {rail}")
 
-    # Infer baseline window (first baseline_s seconds worth of samples)
-    baseline_samples = int(round(baseline_s / dt_s)) if baseline_s > 0 else 0
-    baseline_mean = sum(p[:baseline_samples]) / max(1, min(len(p), baseline_samples)) if baseline_samples else 0.0
-
     intervals = read_llm_intervals(run_log)
     if not intervals:
         raise SystemExit("No LLMXROBOT_EVENT decode intervals found in workload log.")
 
-    # Plot
-    fig, ax = plt.subplots(figsize=(14, 5))
+    # Align tegrastats reconstructed timestamps to event clock.
+    # tegrastats logs time only to 1s resolution, so the reconstructed timeline can
+    # be shifted by up to ~1s. Apply a constant offset using the first decode start.
+    shift_s = 0.0
+    if align_to_events:
+        first_start = min(s for s, _e, _m in intervals)
+        i0 = int(round((first_start - ts[0]) / dt_s))
+        i0 = max(0, min(i0, len(ts) - 1))
+        shift_s = first_start - (ts[0] + i0 * dt_s)
+        if abs(shift_s) > 2.0:
+            shift_s = 0.0
+        ts = [t + shift_s for t in ts]
+
+    # Infer baseline window: default is samples strictly before the first decode start.
+    first_start = min(s for s, _e, _m in intervals)
+    if baseline_s is None:
+        baseline_mask = [t < first_start for t in ts]
+    else:
+        baseline_end = ts[0] + float(baseline_s)
+        baseline_mask = [t < baseline_end for t in ts]
+    baseline_vals = [mw for mw, is_b in zip(p, baseline_mask) if is_b]
+    baseline_mean = (sum(baseline_vals) / len(baseline_vals)) if baseline_vals else 0.0
+
+    # Plot: absolute power (W) + delta power (W) in two subplots with the same markers.
+    fig, (ax0, ax1) = plt.subplots(nrows=2, ncols=1, figsize=(14, 7), sharex=True)
     t0 = ts[0]
     x = [(t - t0) for t in ts]
-    ax.plot(x, p, linewidth=0.8, color="#333333", alpha=0.8, label=f"{rail} mW")
-    if baseline_samples:
-        ax.axhline(baseline_mean, color="#d62728", linestyle="--", linewidth=1.2, alpha=0.8, label=f"baseline mean ({baseline_s:.0f}s)")
+    p_w = [mw / 1000.0 for mw in p]
+    dp_w = [(mw - baseline_mean) / 1000.0 for mw in p]
+
+    ax0.plot(x, p_w, linewidth=0.8, color="#333333", alpha=0.85, label=f"{rail} (W)")
+    ax0.axhline(baseline_mean / 1000.0, color="#d62728", linestyle="--", linewidth=1.2, alpha=0.9, label="baseline mean (W)")
+    ax1.plot(x, dp_w, linewidth=0.9, color="#1f77b4", alpha=0.9, label=f"{rail} delta (W)")
+    ax1.axhline(0.0, color="#999999", linestyle="--", linewidth=1.0, alpha=0.7)
 
     # Mark decode windows
     for i, (s, e, _meta) in enumerate(intervals):
         xs = s - t0
         xe = e - t0
-        ax.axvspan(xs, xe, color="#1f77b4", alpha=0.12)
-        # light start/end lines
-        ax.axvline(xs, color="#1f77b4", alpha=0.25, linewidth=0.8)
-        ax.axvline(xe, color="#1f77b4", alpha=0.25, linewidth=0.8)
+        ax0.axvspan(xs, xe, color="#1f77b4", alpha=0.12)
+        ax1.axvspan(xs, xe, color="#1f77b4", alpha=0.12)
+        ax0.axvline(xs, color="#1f77b4", alpha=0.25, linewidth=0.8)
+        ax0.axvline(xe, color="#1f77b4", alpha=0.25, linewidth=0.8)
+        ax1.axvline(xs, color="#1f77b4", alpha=0.25, linewidth=0.8)
+        ax1.axvline(xe, color="#1f77b4", alpha=0.25, linewidth=0.8)
 
-    ax.set_title(f"Power trace ({rail}) with LLM decode windows (n={len(intervals)})")
-    ax.set_xlabel("Time since start (s)")
-    ax.set_ylabel("Power (mW)")
-    ax.grid(True, alpha=0.25)
-    ax.legend(loc="upper right", fontsize=9)
+    baseline_desc = "auto(pre-first-decode)" if baseline_s is None else f"{baseline_s:.0f}s"
+    align_desc = f", align_shift_s={shift_s:.3f}" if align_to_events else ""
+    ax0.set_title(f"Power ({rail}) with LLM decode windows (n={len(intervals)}), baseline={baseline_desc}{align_desc}")
+    ax1.set_title("Delta power vs baseline (decode windows shaded)")
+    ax1.set_xlabel("Time since start (s)")
+    ax0.set_ylabel("Power (W)")
+    ax1.set_ylabel("Delta power (W)")
+    ax0.grid(True, alpha=0.25)
+    ax1.grid(True, alpha=0.25)
+    ax0.legend(loc="upper right", fontsize=9)
+    ax1.legend(loc="upper right", fontsize=9)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
     plt.close(fig)
@@ -207,9 +277,10 @@ def main():
     ap.add_argument("--tegrastats-log", default="", help="Path to tegrastats_*.log (optional if --logdir is set).")
     ap.add_argument("--run-log", default="", help="Path to workload_*.log (optional if --logdir is set).")
     ap.add_argument("--interval-ms", type=int, default=100)
-    ap.add_argument("--baseline-s", type=float, default=30.0)
+    ap.add_argument("--baseline-s", default="auto", help="Baseline duration in seconds, or 'auto' (default: auto = all samples before first decode).")
+    ap.add_argument("--no-align", action="store_true", help="Disable auto alignment of tegrastats timestamps to decode event clock.")
     ap.add_argument("--rails", default="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV", help="Rails to plot for energy-per-test.")
-    ap.add_argument("--trace-rail", default="VDD_GPU_SOC", help="Single rail to plot for the full-run trace.")
+    ap.add_argument("--trace-rail", default="VIN_SYS_5V0", help="Single rail to plot for the full-run trace.")
     ap.add_argument("--outdir", default="plots", help="Output directory for images.")
     args = ap.parse_args()
 
@@ -245,21 +316,30 @@ def main():
     energy_plot = os.path.join(args.outdir, "energy_per_test.png")
     plot_energy_per_test(segments, outpath=energy_plot, rails=rails)
 
+    power_plot = os.path.join(args.outdir, "power_per_test.png")
+    plot_power_per_test(segments, outpath=power_plot, rails=rails)
+
     trace_plot = os.path.join(args.outdir, "power_trace_with_decode_windows.png")
+    baseline_s: float | None
+    if isinstance(args.baseline_s, str) and args.baseline_s.strip().lower() in ("auto", ""):
+        baseline_s = None
+    else:
+        baseline_s = float(args.baseline_s)
     plot_power_with_markers(
         tegrastats_log=teg,
         run_log=run,
         outpath=trace_plot,
         rail=args.trace_rail,
         interval_ms=args.interval_ms,
-        baseline_s=args.baseline_s,
+        baseline_s=baseline_s,
+        align_to_events=not args.no_align,
     )
 
     print("wrote:")
     print(f"  {energy_plot}")
+    print(f"  {power_plot}")
     print(f"  {trace_plot}")
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
