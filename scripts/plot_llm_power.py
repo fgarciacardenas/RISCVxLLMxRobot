@@ -82,6 +82,25 @@ def read_segments_csv(path: str) -> list[SegmentEnergy]:
     return out
 
 
+def read_segments_csv_meta(path: str) -> dict[str, str]:
+    """
+    Best-effort: extract run-wide metadata columns (baseline_mode/estimator) from the first row.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            r = csv.DictReader(f)
+            first = next(r, None)
+            if not first:
+                return {}
+            meta = {}
+            for k in ("baseline_mode", "baseline_estimator", "baseline_n"):
+                if k in first and first[k] not in (None, ""):
+                    meta[k] = str(first[k])
+            return meta
+    except Exception:
+        return {}
+
+
 def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: list[str], clamp_delta: bool):
     by_rail: dict[str, list[SegmentEnergy]] = {}
     for s in segments:
@@ -304,7 +323,7 @@ def main():
     ap.add_argument("--no-align", action="store_true", help="Disable auto alignment of tegrastats timestamps to decode event clock.")
     ap.add_argument("--clamp-delta", action="store_true", help="Clamp delta energy/power at 0 in per-test plots (visualization only).")
     ap.add_argument("--rails", default="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV", help="Rails to plot for energy-per-test.")
-    ap.add_argument("--trace-rail", default="VIN_SYS_5V0", help="Single rail to plot for the full-run trace.")
+    ap.add_argument("--trace-rail", default="VDD_CPU_CV", help="Single rail to plot for the full-run trace.")
     ap.add_argument("--outdir", default="plots", help="Output directory for images.")
     args = ap.parse_args()
 
@@ -316,8 +335,11 @@ def main():
     if logdir:
         # Prefer most recent matching set.
         def _pick_latest(prefix: str, suffix: str):
-            cands = [f for f in os.listdir(logdir) if f.startswith(prefix) and f.endswith(suffix)]
-            return os.path.join(logdir, sorted(cands)[-1]) if cands else ""
+            cands = [os.path.join(logdir, f) for f in os.listdir(logdir) if f.startswith(prefix) and f.endswith(suffix)]
+            if not cands:
+                return ""
+            # Pick by modification time (lexicographic order can be misleading once you start adding suffixes).
+            return max(cands, key=lambda p: os.path.getmtime(p))
 
         if not seg:
             seg = _pick_latest("llm_segments_", ".csv")
@@ -337,6 +359,14 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
 
     segments = read_segments_csv(seg)
+    seg_meta = read_segments_csv_meta(seg)
+    print("Using logs:")
+    print(f"  segments:   {seg}")
+    if seg_meta:
+        print("  segments_meta: " + ", ".join([f"{k}={v}" for k, v in sorted(seg_meta.items())]))
+    print(f"  tegrastats:  {teg}")
+    print(f"  workload:    {run}")
+
     energy_plot = os.path.join(args.outdir, "energy_per_test.png")
     plot_energy_per_test(segments, outpath=energy_plot, rails=rails, clamp_delta=args.clamp_delta)
 

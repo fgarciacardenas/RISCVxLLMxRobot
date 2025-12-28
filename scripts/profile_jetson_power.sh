@@ -292,7 +292,7 @@ echo
 echo "Starting tegrastats (${INTERVAL_MS}ms interval)..."
 sudo tegrastats --interval "$INTERVAL_MS" --logfile "$TEGRA_LOG" &
 TEGRA_PID=$!
-emit_runlog_event "power_profile_start" "\"baseline_s\":${BASELINE_S},\"interval_ms\":${INTERVAL_MS}"
+emit_runlog_event "power_profile_start" "\"baseline_s\":${BASELINE_S},\"interval_ms\":${INTERVAL_MS},\"baseline_estimator\":\"${BASELINE_ESTIMATOR}\""
 
 if [[ "$BASELINE_S" != "0" ]]; then
   echo "Baseline: ${BASELINE_S}s (keep system idle for best attribution)..."
