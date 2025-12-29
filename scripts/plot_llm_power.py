@@ -135,6 +135,7 @@ def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: lis
     axes[-1].set_xlabel("Decode window idx")
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
     plt.close(fig)
 
 
@@ -174,6 +175,7 @@ def plot_power_per_test(segments: list[SegmentEnergy], outpath: str, rails: list
     axes[-1].set_xlabel("Decode window idx")
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
     plt.close(fig)
 
 
@@ -284,6 +286,7 @@ def plot_power_with_markers(
     ax1.legend(loc="upper right", fontsize=9)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
     plt.close(fig)
     return {
         "align_shift_s": shift_s,
@@ -291,6 +294,73 @@ def plot_power_with_markers(
         "baseline_samples": baseline_samples,
         "baseline_mode": baseline_mode,
     }
+
+
+def plot_delta_power_only_with_markers(
+    tegrastats_log: str,
+    run_log: str,
+    outpath: str,
+    rails: list[str],
+    segments: list[SegmentEnergy],
+    align_to_events: bool,
+):
+    intervals = read_llm_intervals(run_log)
+    if not intervals:
+        raise SystemExit("No LLMXROBOT_EVENT decode intervals found in workload log.")
+
+    # Baselines from llm_segments CSV (so deltas match segment integration).
+    baseline_by_rail_mw: dict[str, float] = {}
+    for rail in rails:
+        bs = [s.baseline_mw for s in segments if s.rail == rail and s.baseline_mw is not None and math.isfinite(s.baseline_mw)]
+        baseline_by_rail_mw[rail] = float(sum(bs) / len(bs)) if bs else 0.0
+
+    # Load tegrastats stream containing all rails (same timestamps for all rails).
+    ts: list[float] = []
+    p_mw_by_rail: dict[str, list[float]] = {r: [] for r in rails}
+    for s in iter_tegrastats_samples(tegrastats_log, rails=rails):
+        ts.append(float(s.t_epoch_s))
+        for r in rails:
+            p_mw_by_rail[r].append(float(s.rails_mw.get(r, 0)))
+    if not ts:
+        raise SystemExit("No tegrastats samples found.")
+
+    shift_s = 0.0
+    if align_to_events:
+        first_start = min(s for s, _e, _m in intervals)
+        i0 = min(range(len(ts)), key=lambda i: abs(ts[i] - first_start))
+        shift_s = float(first_start) - float(ts[i0])
+        if abs(shift_s) > 2.0:
+            shift_s = 0.0
+        ts = [t + shift_s for t in ts]
+
+    t0 = ts[0]
+    x = [t - t0 for t in ts]
+
+    name_map = {"VDD_CPU_CV": "CPU", "VDD_GPU_SOC": "GPU", "VIN_SYS_5V0": "VIN"}
+    baseline_desc = ", ".join([f"{name_map.get(r, r)}={baseline_by_rail_mw[r]/1000.0:.3f} W" for r in rails])
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 4.3), sharex=True)
+    for r in rails:
+        b = baseline_by_rail_mw.get(r, 0.0)
+        dp_w = [((mw - b) / 1000.0) for mw in p_mw_by_rail[r]]
+        ax.plot(x, dp_w, linewidth=0.9, alpha=0.95, label=name_map.get(r, r))
+
+    for (s, e, _meta) in intervals:
+        xs = s - t0
+        xe = e - t0
+        ax.axvspan(xs, xe, color="#1f77b4", alpha=0.10)
+
+    ax.axhline(0.0, color="#999999", linestyle="--", linewidth=1.0, alpha=0.7)
+    ax.set_xlabel("Time since start (s)")
+    ax.set_ylabel("Power (W)")
+    ax.set_title(f"Jetson power plot. Baseline substracted: {baseline_desc}")
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="upper right", fontsize=9, ncol=min(3, len(rails)))
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
+    plt.close(fig)
+    return {"align_shift_s": shift_s, "baseline_by_rail_mW": baseline_by_rail_mw}
 
 
 def print_segment_baselines(segments: list[SegmentEnergy], rails: list[str]):
@@ -326,6 +396,7 @@ def main():
     ap.add_argument("--clamp-delta", action="store_true", help="Clamp delta energy/power at 0 in per-test plots (visualization only).")
     ap.add_argument("--rails", default="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV", help="Rails to plot for energy-per-test.")
     ap.add_argument("--trace-rail", default="VDD_GPU_SOC", help="Single rail to plot for the full-run trace.")
+    ap.add_argument("--delta-only-rails", default="VDD_CPU_CV,VDD_GPU_SOC,VIN_SYS_5V0", help="Rails to plot for the delta-only trace.")
     ap.add_argument("--outdir", default="plots", help="Output directory for images.")
     args = ap.parse_args()
 
@@ -398,16 +469,32 @@ def main():
         align_to_events=not args.no_align,
     )
 
+    delta_rails = [r.strip() for r in args.delta_only_rails.split(",") if r.strip()]
+    delta_plot = os.path.join(args.outdir, "delta_power_trace_only.png")
+    delta_meta = plot_delta_power_only_with_markers(
+        tegrastats_log=teg,
+        run_log=run,
+        outpath=delta_plot,
+        rails=delta_rails,
+        segments=segments,
+        align_to_events=not args.no_align,
+    )
+
     print_segment_baselines(segments, rails=rails)
     print(
         f"Trace baseline ({args.trace_rail}): mean={trace_meta['baseline_mean_mW']/1000.0:.3f} W "
         f"(samples={trace_meta['baseline_samples']}, mode={trace_meta['baseline_mode']}, align_shift_s={trace_meta['align_shift_s']:.3f})"
+    )
+    print(
+        "Delta-only trace baselines: "
+        + ", ".join([f"{k}={v/1000.0:.3f} W" for k, v in sorted(delta_meta["baseline_by_rail_mW"].items())])
     )
 
     print("wrote:")
     print(f"  {energy_plot}")
     print(f"  {power_plot}")
     print(f"  {trace_plot}")
+    print(f"  {delta_plot}")
 
 
 if __name__ == "__main__":

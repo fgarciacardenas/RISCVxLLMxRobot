@@ -135,6 +135,7 @@ def plot_energy_per_test(segments: list[SegmentEnergy], outpath: str, rails: lis
     axes[-1].set_xlabel("Decode window idx")
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
     plt.close(fig)
 
 
@@ -169,6 +170,7 @@ def plot_power_per_test(segments: list[SegmentEnergy], outpath: str, rails: list
     axes[-1].set_xlabel("Decode window idx")
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
     plt.close(fig)
 
 
@@ -278,6 +280,90 @@ def plot_power_trace(
     ax1.legend(loc="upper right", fontsize=9)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
+    plt.close(fig)
+
+
+def plot_delta_power_only_trace(
+    power_csv: str,
+    run_log: str,
+    segments: list[SegmentEnergy],
+    outpath: str,
+    baseline_s: float | None,
+    clamp_delta: bool,
+    align: bool,
+    trim_baseline: bool,
+):
+    ts, p_mw = read_power_csv(power_csv)
+    if not ts:
+        raise SystemExit("No power samples found.")
+    intervals = read_llm_intervals(run_log)
+    if not intervals:
+        raise SystemExit("No decode intervals found in run log.")
+
+    shift_s = 0.0
+    if align:
+        first_start = min(s for s, _e, _m in intervals)
+        i0 = min(range(len(ts)), key=lambda i: abs(ts[i] - first_start))
+        shift_s = first_start - ts[i0]
+        if abs(shift_s) > 2.0:
+            shift_s = 0.0
+        ts = [t + shift_s for t in ts]
+
+    # Baseline from segments CSV if present.
+    bs = [s.baseline_mw for s in segments if s.baseline_mw is not None and math.isfinite(s.baseline_mw)]
+    baseline_mean = float(sum(bs) / len(bs)) if bs else 0.0
+    baseline_w = baseline_mean / 1000.0
+
+    first_start = min(s for s, _e, _m in intervals)
+    trim_label = "none"
+    trim_start = ts[0]
+    if trim_baseline:
+        workload_start = read_first_event_time(run_log, "workload_start")
+        if workload_start is not None:
+            trim_label = "workload_start"
+            trim_start = workload_start
+        elif baseline_s is not None:
+            trim_label = "baseline_s"
+            trim_start = ts[0] + float(baseline_s)
+        else:
+            trim_label = "first_decode"
+            trim_start = first_start
+
+    ts_plot = ts
+    p_plot = p_mw
+    if trim_baseline:
+        keep = [(t, mw) for t, mw in zip(ts, p_mw) if t >= trim_start]
+        if keep:
+            ts_plot = [t for t, _mw in keep]
+            p_plot = [mw for _t, mw in keep]
+
+    t0 = ts_plot[0]
+    x = [t - t0 for t in ts_plot]
+    dp_w = [(mw - baseline_mean) / 1000.0 for mw in p_plot]
+    if clamp_delta:
+        dp_w = [max(0.0, v) for v in dp_w]
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 4.3), sharex=True)
+    ax.plot(x, dp_w, linewidth=0.9, color="#1f77b4", alpha=0.95, label="GPU")
+    ax.axhline(0.0, color="#999999", linestyle="--", linewidth=1.0, alpha=0.7)
+
+    for (s, e, _m) in intervals:
+        if e <= t0:
+            continue
+        xs = max(0.0, s - t0)
+        xe = max(0.0, e - t0)
+        ax.axvspan(xs, xe, color="#1f77b4", alpha=0.10)
+
+    trim_desc = f"{trim_label}@{trim_start - ts[0]:.1f}s" if trim_baseline else "none"
+    ax.set_title(f"GPU power plot. Baseline substracted: {baseline_w:.3f} W (trim_baseline={trim_desc}, align_shift_s={shift_s:.3f})")
+    ax.set_xlabel("Time since start (s)")
+    ax.set_ylabel("Power (W)")
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=160)
+    fig.savefig(os.path.splitext(outpath)[0] + ".pdf")
     plt.close(fig)
 
 
@@ -351,10 +437,22 @@ def main():
         align=(not args.no_align),
         trim_baseline=args.trim_baseline,
     )
+    delta_only_plot = os.path.join(args.outdir, "delta_power_trace_only.png")
+    plot_delta_power_only_trace(
+        pwr,
+        run,
+        segments,
+        delta_only_plot,
+        baseline_s=baseline_s,
+        clamp_delta=args.clamp_delta,
+        align=(not args.no_align),
+        trim_baseline=args.trim_baseline,
+    )
     print("wrote:")
     print(f"  {energy_plot}")
     print(f"  {power_plot}")
     print(f"  {trace_plot}")
+    print(f"  {delta_only_plot}")
 
 
 if __name__ == "__main__":
