@@ -355,7 +355,7 @@ def plot_delta_power_only_with_markers(
     ax.set_ylabel("Power (W)")
     ax.set_title(f"Jetson power plot. Baseline substracted: {baseline_desc}")
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="upper right", fontsize=9, ncol=min(3, len(rails)))
+    ax.legend(loc="upper right", fontsize=9, ncol=1)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
     fig.savefig(os.path.splitext(outpath)[0] + ".pdf")

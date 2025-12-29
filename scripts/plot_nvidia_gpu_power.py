@@ -360,7 +360,7 @@ def plot_delta_power_only_trace(
     ax.set_xlabel("Time since start (s)")
     ax.set_ylabel("Power (W)")
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="upper right", fontsize=9)
+    ax.legend(loc="upper right", fontsize=9, ncol=1)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
     fig.savefig(os.path.splitext(outpath)[0] + ".pdf")

@@ -1,0 +1,129 @@
+LLMXROBOT_EVENT {"event":"power_profile_start","t_epoch_s":1766961007.758390,"gpu":0,"baseline_s":30,"interval_ms":100,"baseline_estimator":"p10"}
+LLMXROBOT_EVENT {"event":"workload_start","t_epoch_s":1766961037.769053,"container":"","workdir":"/embodiedai"}
+[bench] model_dir=models/microsoft_Phi-3-mini-4k-instruct-gguf gguf=Phi-3-mini-4k-instruct-q4.gguf prompts=40
+[bench] warmup=1 max_tokens=512 n_ctx=4096 n_gpu_layers=-1
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1462, "t_epoch_s": 1766961039.9078019, "t_perf_s": 6876006.488899407, "ts": "2025-12-28T23:30:39.907"}
+LLMXROBOT_EVENT {"completion_tokens": 134, "event": "llm_decode_end", "prompt_tokens": 578, "t_epoch_s": 1766961040.9283433, "t_perf_s": 6876007.509440967, "ts": "2025-12-28T23:30:40.928"}
+[bench] i=-1 dt_s=2.851 prompt_toks=578 out_toks=134
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1462, "t_epoch_s": 1766961040.9284267, "t_perf_s": 6876007.509523663, "ts": "2025-12-28T23:30:40.928"}
+LLMXROBOT_EVENT {"completion_tokens": 134, "event": "llm_decode_end", "prompt_tokens": 578, "t_epoch_s": 1766961041.7805336, "t_perf_s": 6876008.361631055, "ts": "2025-12-28T23:30:41.780"}
+[bench] i=0 dt_s=3.703 prompt_toks=578 out_toks=134
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1387, "t_epoch_s": 1766961041.780613, "t_perf_s": 6876008.361709774, "ts": "2025-12-28T23:30:41.780"}
+LLMXROBOT_EVENT {"completion_tokens": 106, "event": "llm_decode_end", "prompt_tokens": 503, "t_epoch_s": 1766961042.4894352, "t_perf_s": 6876009.07053244, "ts": "2025-12-28T23:30:42.489"}
+[bench] i=1 dt_s=4.412 prompt_toks=503 out_toks=106
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1499, "t_epoch_s": 1766961042.489506, "t_perf_s": 6876009.070603023, "ts": "2025-12-28T23:30:42.489"}
+LLMXROBOT_EVENT {"completion_tokens": 78, "event": "llm_decode_end", "prompt_tokens": 615, "t_epoch_s": 1766961043.0424368, "t_perf_s": 6876009.623534652, "ts": "2025-12-28T23:30:43.042"}
+[bench] i=2 dt_s=4.965 prompt_toks=615 out_toks=78
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1350, "t_epoch_s": 1766961043.0425262, "t_perf_s": 6876009.623623109, "ts": "2025-12-28T23:30:43.042"}
+LLMXROBOT_EVENT {"completion_tokens": 111, "event": "llm_decode_end", "prompt_tokens": 466, "t_epoch_s": 1766961043.775446, "t_perf_s": 6876010.356543715, "ts": "2025-12-28T23:30:43.775"}
+[bench] i=3 dt_s=5.698 prompt_toks=466 out_toks=111
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1554, "t_epoch_s": 1766961043.7755303, "t_perf_s": 6876010.356627303, "ts": "2025-12-28T23:30:43.775"}
+LLMXROBOT_EVENT {"completion_tokens": 79, "event": "llm_decode_end", "prompt_tokens": 670, "t_epoch_s": 1766961044.349172, "t_perf_s": 6876010.930269685, "ts": "2025-12-28T23:30:44.349"}
+[bench] i=4 dt_s=6.272 prompt_toks=670 out_toks=79
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1472, "t_epoch_s": 1766961044.3492322, "t_perf_s": 6876010.930329207, "ts": "2025-12-28T23:30:44.349"}
+LLMXROBOT_EVENT {"completion_tokens": 111, "event": "llm_decode_end", "prompt_tokens": 578, "t_epoch_s": 1766961045.1190822, "t_perf_s": 6876011.700179651, "ts": "2025-12-28T23:30:45.119"}
+[bench] i=5 dt_s=7.042 prompt_toks=578 out_toks=111
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1397, "t_epoch_s": 1766961045.1191554, "t_perf_s": 6876011.700252518, "ts": "2025-12-28T23:30:45.119"}
+LLMXROBOT_EVENT {"completion_tokens": 107, "event": "llm_decode_end", "prompt_tokens": 503, "t_epoch_s": 1766961045.8341498, "t_perf_s": 6876012.415247263, "ts": "2025-12-28T23:30:45.834"}
+[bench] i=6 dt_s=7.757 prompt_toks=503 out_toks=107
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1509, "t_epoch_s": 1766961045.8342266, "t_perf_s": 6876012.415323657, "ts": "2025-12-28T23:30:45.834"}
+LLMXROBOT_EVENT {"completion_tokens": 114, "event": "llm_decode_end", "prompt_tokens": 615, "t_epoch_s": 1766961046.6170435, "t_perf_s": 6876013.198140581, "ts": "2025-12-28T23:30:46.617"}
+[bench] i=7 dt_s=8.540 prompt_toks=615 out_toks=114
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1360, "t_epoch_s": 1766961046.6170964, "t_perf_s": 6876013.19819346, "ts": "2025-12-28T23:30:46.617"}
+LLMXROBOT_EVENT {"completion_tokens": 133, "event": "llm_decode_end", "prompt_tokens": 466, "t_epoch_s": 1766961047.490236, "t_perf_s": 6876014.071333953, "ts": "2025-12-28T23:30:47.490"}
+[bench] i=8 dt_s=9.413 prompt_toks=466 out_toks=133
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1564, "t_epoch_s": 1766961047.4903135, "t_perf_s": 6876014.071410558, "ts": "2025-12-28T23:30:47.490"}
+LLMXROBOT_EVENT {"completion_tokens": 274, "event": "llm_decode_end", "prompt_tokens": 670, "t_epoch_s": 1766961049.3429153, "t_perf_s": 6876015.924012889, "ts": "2025-12-28T23:30:49.342"}
+[bench] i=9 dt_s=11.265 prompt_toks=670 out_toks=274
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1468, "t_epoch_s": 1766961049.3430066, "t_perf_s": 6876015.924103741, "ts": "2025-12-28T23:30:49.343"}
+LLMXROBOT_EVENT {"completion_tokens": 168, "event": "llm_decode_end", "prompt_tokens": 574, "t_epoch_s": 1766961050.502024, "t_perf_s": 6876017.08312147, "ts": "2025-12-28T23:30:50.502"}
+[bench] i=10 dt_s=12.425 prompt_toks=574 out_toks=168
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1393, "t_epoch_s": 1766961050.502112, "t_perf_s": 6876017.083208855, "ts": "2025-12-28T23:30:50.502"}
+LLMXROBOT_EVENT {"completion_tokens": 160, "event": "llm_decode_end", "prompt_tokens": 499, "t_epoch_s": 1766961051.5561783, "t_perf_s": 6876018.137275803, "ts": "2025-12-28T23:30:51.556"}
+[bench] i=11 dt_s=13.479 prompt_toks=499 out_toks=160
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1505, "t_epoch_s": 1766961051.5562642, "t_perf_s": 6876018.137361214, "ts": "2025-12-28T23:30:51.556"}
+LLMXROBOT_EVENT {"completion_tokens": 159, "event": "llm_decode_end", "prompt_tokens": 611, "t_epoch_s": 1766961052.629524, "t_perf_s": 6876019.210621494, "ts": "2025-12-28T23:30:52.629"}
+[bench] i=12 dt_s=14.552 prompt_toks=611 out_toks=159
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1356, "t_epoch_s": 1766961052.6295972, "t_perf_s": 6876019.210694201, "ts": "2025-12-28T23:30:52.629"}
+LLMXROBOT_EVENT {"completion_tokens": 123, "event": "llm_decode_end", "prompt_tokens": 462, "t_epoch_s": 1766961053.4396296, "t_perf_s": 6876020.020726995, "ts": "2025-12-28T23:30:53.439"}
+[bench] i=13 dt_s=15.362 prompt_toks=462 out_toks=123
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1560, "t_epoch_s": 1766961053.4397035, "t_perf_s": 6876020.020800463, "ts": "2025-12-28T23:30:53.439"}
+LLMXROBOT_EVENT {"completion_tokens": 158, "event": "llm_decode_end", "prompt_tokens": 666, "t_epoch_s": 1766961054.5246315, "t_perf_s": 6876021.105728956, "ts": "2025-12-28T23:30:54.524"}
+[bench] i=14 dt_s=16.447 prompt_toks=666 out_toks=158
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1462, "t_epoch_s": 1766961054.5247128, "t_perf_s": 6876021.105809618, "ts": "2025-12-28T23:30:54.524"}
+LLMXROBOT_EVENT {"completion_tokens": 65, "event": "llm_decode_end", "prompt_tokens": 579, "t_epoch_s": 1766961055.0036259, "t_perf_s": 6876021.584723505, "ts": "2025-12-28T23:30:55.003"}
+[bench] i=15 dt_s=16.926 prompt_toks=579 out_toks=65
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1387, "t_epoch_s": 1766961055.003714, "t_perf_s": 6876021.58481092, "ts": "2025-12-28T23:30:55.003"}
+LLMXROBOT_EVENT {"completion_tokens": 62, "event": "llm_decode_end", "prompt_tokens": 504, "t_epoch_s": 1766961055.4364836, "t_perf_s": 6876022.017581035, "ts": "2025-12-28T23:30:55.436"}
+[bench] i=16 dt_s=17.359 prompt_toks=504 out_toks=62
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1499, "t_epoch_s": 1766961055.436568, "t_perf_s": 6876022.017665154, "ts": "2025-12-28T23:30:55.436"}
+LLMXROBOT_EVENT {"completion_tokens": 65, "event": "llm_decode_end", "prompt_tokens": 616, "t_epoch_s": 1766961055.9089696, "t_perf_s": 6876022.490067282, "ts": "2025-12-28T23:30:55.908"}
+[bench] i=17 dt_s=17.831 prompt_toks=616 out_toks=65
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1350, "t_epoch_s": 1766961055.9090621, "t_perf_s": 6876022.490159075, "ts": "2025-12-28T23:30:55.909"}
+LLMXROBOT_EVENT {"completion_tokens": 73, "event": "llm_decode_end", "prompt_tokens": 467, "t_epoch_s": 1766961056.4043229, "t_perf_s": 6876022.985420699, "ts": "2025-12-28T23:30:56.404"}
+[bench] i=18 dt_s=18.327 prompt_toks=467 out_toks=73
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1554, "t_epoch_s": 1766961056.404409, "t_perf_s": 6876022.985505669, "ts": "2025-12-28T23:30:56.404"}
+LLMXROBOT_EVENT {"completion_tokens": 65, "event": "llm_decode_end", "prompt_tokens": 671, "t_epoch_s": 1766961056.889853, "t_perf_s": 6876023.470950391, "ts": "2025-12-28T23:30:56.889"}
+[bench] i=19 dt_s=18.812 prompt_toks=671 out_toks=65
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1498, "t_epoch_s": 1766961056.8899357, "t_perf_s": 6876023.471032676, "ts": "2025-12-28T23:30:56.889"}
+LLMXROBOT_EVENT {"completion_tokens": 107, "event": "llm_decode_end", "prompt_tokens": 582, "t_epoch_s": 1766961057.636498, "t_perf_s": 6876024.217595457, "ts": "2025-12-28T23:30:57.636"}
+[bench] i=20 dt_s=19.559 prompt_toks=582 out_toks=107
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1423, "t_epoch_s": 1766961057.6365757, "t_perf_s": 6876024.217672612, "ts": "2025-12-28T23:30:57.636"}
+LLMXROBOT_EVENT {"completion_tokens": 86, "event": "llm_decode_end", "prompt_tokens": 507, "t_epoch_s": 1766961058.221183, "t_perf_s": 6876024.802280552, "ts": "2025-12-28T23:30:58.221"}
+[bench] i=21 dt_s=20.144 prompt_toks=507 out_toks=86
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1535, "t_epoch_s": 1766961058.2212596, "t_perf_s": 6876024.802356395, "ts": "2025-12-28T23:30:58.221"}
+LLMXROBOT_EVENT {"completion_tokens": 90, "event": "llm_decode_end", "prompt_tokens": 619, "t_epoch_s": 1766961058.8532507, "t_perf_s": 6876025.434348365, "ts": "2025-12-28T23:30:58.853"}
+[bench] i=22 dt_s=20.776 prompt_toks=619 out_toks=90
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1386, "t_epoch_s": 1766961058.8533213, "t_perf_s": 6876025.434418227, "ts": "2025-12-28T23:30:58.853"}
+LLMXROBOT_EVENT {"completion_tokens": 84, "event": "llm_decode_end", "prompt_tokens": 470, "t_epoch_s": 1766961059.418061, "t_perf_s": 6876025.999158883, "ts": "2025-12-28T23:30:59.418"}
+[bench] i=23 dt_s=21.341 prompt_toks=470 out_toks=84
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1590, "t_epoch_s": 1766961059.4181454, "t_perf_s": 6876025.999242521, "ts": "2025-12-28T23:30:59.418"}
+LLMXROBOT_EVENT {"completion_tokens": 109, "event": "llm_decode_end", "prompt_tokens": 674, "t_epoch_s": 1766961060.187848, "t_perf_s": 6876026.768945687, "ts": "2025-12-28T23:31:00.187"}
+[bench] i=24 dt_s=22.110 prompt_toks=674 out_toks=109
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1488, "t_epoch_s": 1766961060.1879287, "t_perf_s": 6876026.769025577, "ts": "2025-12-28T23:31:00.187"}
+LLMXROBOT_EVENT {"completion_tokens": 112, "event": "llm_decode_end", "prompt_tokens": 580, "t_epoch_s": 1766961060.9662905, "t_perf_s": 6876027.547387982, "ts": "2025-12-28T23:31:00.966"}
+[bench] i=25 dt_s=22.889 prompt_toks=580 out_toks=112
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1413, "t_epoch_s": 1766961060.9663718, "t_perf_s": 6876027.547468964, "ts": "2025-12-28T23:31:00.966"}
+LLMXROBOT_EVENT {"completion_tokens": 110, "event": "llm_decode_end", "prompt_tokens": 505, "t_epoch_s": 1766961061.701969, "t_perf_s": 6876028.283066398, "ts": "2025-12-28T23:31:01.701"}
+[bench] i=26 dt_s=23.624 prompt_toks=505 out_toks=110
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1525, "t_epoch_s": 1766961061.7020442, "t_perf_s": 6876028.283141089, "ts": "2025-12-28T23:31:01.702"}
+LLMXROBOT_EVENT {"completion_tokens": 110, "event": "llm_decode_end", "prompt_tokens": 617, "t_epoch_s": 1766961062.4605598, "t_perf_s": 6876029.04165744, "ts": "2025-12-28T23:31:02.460"}
+[bench] i=27 dt_s=24.383 prompt_toks=617 out_toks=110
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1376, "t_epoch_s": 1766961062.4606378, "t_perf_s": 6876029.041734756, "ts": "2025-12-28T23:31:02.460"}
+LLMXROBOT_EVENT {"completion_tokens": 196, "event": "llm_decode_end", "prompt_tokens": 468, "t_epoch_s": 1766961063.737022, "t_perf_s": 6876030.31811971, "ts": "2025-12-28T23:31:03.737"}
+[bench] i=28 dt_s=25.660 prompt_toks=468 out_toks=196
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1580, "t_epoch_s": 1766961063.737113, "t_perf_s": 6876030.31821007, "ts": "2025-12-28T23:31:03.737"}
+LLMXROBOT_EVENT {"completion_tokens": 106, "event": "llm_decode_end", "prompt_tokens": 672, "t_epoch_s": 1766961064.4851813, "t_perf_s": 6876031.066278831, "ts": "2025-12-28T23:31:04.485"}
+[bench] i=29 dt_s=26.408 prompt_toks=672 out_toks=106
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1488, "t_epoch_s": 1766961064.4852514, "t_perf_s": 6876031.066348302, "ts": "2025-12-28T23:31:04.485"}
+LLMXROBOT_EVENT {"completion_tokens": 57, "event": "llm_decode_end", "prompt_tokens": 586, "t_epoch_s": 1766961064.9124866, "t_perf_s": 6876031.493583871, "ts": "2025-12-28T23:31:04.912"}
+[bench] i=30 dt_s=26.835 prompt_toks=586 out_toks=57
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1413, "t_epoch_s": 1766961064.9125388, "t_perf_s": 6876031.493635839, "ts": "2025-12-28T23:31:04.912"}
+LLMXROBOT_EVENT {"completion_tokens": 57, "event": "llm_decode_end", "prompt_tokens": 511, "t_epoch_s": 1766961065.3128297, "t_perf_s": 6876031.893926891, "ts": "2025-12-28T23:31:05.312"}
+[bench] i=31 dt_s=27.235 prompt_toks=511 out_toks=57
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1525, "t_epoch_s": 1766961065.3128834, "t_perf_s": 6876031.893980301, "ts": "2025-12-28T23:31:05.312"}
+LLMXROBOT_EVENT {"completion_tokens": 57, "event": "llm_decode_end", "prompt_tokens": 623, "t_epoch_s": 1766961065.7330418, "t_perf_s": 6876032.314139157, "ts": "2025-12-28T23:31:05.733"}
+[bench] i=32 dt_s=27.656 prompt_toks=623 out_toks=57
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1376, "t_epoch_s": 1766961065.7331064, "t_perf_s": 6876032.314203368, "ts": "2025-12-28T23:31:05.733"}
+LLMXROBOT_EVENT {"completion_tokens": 77, "event": "llm_decode_end", "prompt_tokens": 474, "t_epoch_s": 1766961066.2522955, "t_perf_s": 6876032.83339253, "ts": "2025-12-28T23:31:06.252"}
+[bench] i=33 dt_s=28.175 prompt_toks=474 out_toks=77
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1580, "t_epoch_s": 1766961066.252353, "t_perf_s": 6876032.833449858, "ts": "2025-12-28T23:31:06.252"}
+LLMXROBOT_EVENT {"completion_tokens": 54, "event": "llm_decode_end", "prompt_tokens": 678, "t_epoch_s": 1766961066.66702, "t_perf_s": 6876033.248117138, "ts": "2025-12-28T23:31:06.667"}
+[bench] i=34 dt_s=28.590 prompt_toks=678 out_toks=54
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1490, "t_epoch_s": 1766961066.6670728, "t_perf_s": 6876033.248169848, "ts": "2025-12-28T23:31:06.667"}
+LLMXROBOT_EVENT {"completion_tokens": 163, "event": "llm_decode_end", "prompt_tokens": 580, "t_epoch_s": 1766961067.7717032, "t_perf_s": 6876034.352800932, "ts": "2025-12-28T23:31:07.771"}
+[bench] i=35 dt_s=29.694 prompt_toks=580 out_toks=163
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1415, "t_epoch_s": 1766961067.7717786, "t_perf_s": 6876034.352875663, "ts": "2025-12-28T23:31:07.771"}
+LLMXROBOT_EVENT {"completion_tokens": 195, "event": "llm_decode_end", "prompt_tokens": 505, "t_epoch_s": 1766961069.0500789, "t_perf_s": 6876035.631176389, "ts": "2025-12-28T23:31:09.050"}
+[bench] i=36 dt_s=30.973 prompt_toks=505 out_toks=195
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1527, "t_epoch_s": 1766961069.0501535, "t_perf_s": 6876035.631250429, "ts": "2025-12-28T23:31:09.050"}
+LLMXROBOT_EVENT {"completion_tokens": 168, "event": "llm_decode_end", "prompt_tokens": 617, "t_epoch_s": 1766961070.1826425, "t_perf_s": 6876036.763740166, "ts": "2025-12-28T23:31:10.182"}
+[bench] i=37 dt_s=32.105 prompt_toks=617 out_toks=168
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1378, "t_epoch_s": 1766961070.1827085, "t_perf_s": 6876036.763805479, "ts": "2025-12-28T23:31:10.182"}
+LLMXROBOT_EVENT {"completion_tokens": 210, "event": "llm_decode_end", "prompt_tokens": 468, "t_epoch_s": 1766961071.5483627, "t_perf_s": 6876038.129460354, "ts": "2025-12-28T23:31:11.548"}
+[bench] i=38 dt_s=33.471 prompt_toks=468 out_toks=210
+LLMXROBOT_EVENT {"event": "llm_decode_start", "max_tokens": 512, "model_path": "models/microsoft_Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf", "n_ctx": 4096, "prompt_chars": 1582, "t_epoch_s": 1766961071.548436, "t_perf_s": 6876038.129533001, "ts": "2025-12-28T23:31:11.548"}
+LLMXROBOT_EVENT {"completion_tokens": 179, "event": "llm_decode_end", "prompt_tokens": 672, "t_epoch_s": 1766961072.7715578, "t_perf_s": 6876039.35265554, "ts": "2025-12-28T23:31:12.771"}
+[bench] i=39 dt_s=34.694 prompt_toks=672 out_toks=179
+[bench] done ran=40 interrupted=False
+LLMXROBOT_EVENT {"event":"workload_end","t_epoch_s":1766961073.056775,"exit_code":0,"interrupted":0}
