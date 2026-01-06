@@ -293,6 +293,8 @@ def plot_delta_power_only_trace(
     clamp_delta: bool,
     align: bool,
     trim_baseline: bool,
+    xlim_s: tuple[float, float] | None,
+    ylim_w: tuple[float, float] | None,
 ):
     ts, p_mw = read_power_csv(power_csv)
     if not ts:
@@ -360,6 +362,10 @@ def plot_delta_power_only_trace(
     ax.set_xlabel("Time since start (s)")
     ax.set_ylabel("Power (W)")
     ax.grid(True, alpha=0.25)
+    if xlim_s is not None:
+        ax.set_xlim(xlim_s[0], xlim_s[1])
+    if ylim_w is not None:
+        ax.set_ylim(ylim_w[0], ylim_w[1])
     ax.legend(loc="upper right", fontsize=9, ncol=1)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
@@ -377,9 +383,21 @@ def main():
     ap.add_argument("--no-align", action="store_true", help="Disable small timestamp alignment.")
     ap.add_argument("--clamp-delta", action="store_true", help="Clamp delta power/energy at 0 (visualization only).")
     ap.add_argument("--trim-baseline", action="store_true", help="Start trace at workload_start (or baseline end) instead of t=0.")
+    ap.add_argument("--delta-xlim", default="", help="Optional x-axis limits for delta-only trace, e.g. '0,600'.")
+    ap.add_argument("--delta-ylim", default="", help="Optional y-axis limits for delta-only trace (W), e.g. '0,30'.")
     ap.add_argument("--rails", default="", help="Comma-separated rails to plot (default: infer from segments).")
     ap.add_argument("--outdir", default="plots_gpu", help="Output directory.")
     args = ap.parse_args()
+
+    def _parse_lim(spec: str) -> tuple[float, float] | None:
+        s = str(spec or "").strip()
+        if not s:
+            return None
+        for sep in (",", ":"):
+            if sep in s:
+                a, b = s.split(sep, 1)
+                return float(a.strip()), float(b.strip())
+        raise SystemExit(f"Invalid limit spec: '{spec}' (expected 'min,max')")
 
     seg = args.segments_csv.strip()
     pwr = args.power_csv.strip()
@@ -447,6 +465,8 @@ def main():
         clamp_delta=args.clamp_delta,
         align=(not args.no_align),
         trim_baseline=args.trim_baseline,
+        xlim_s=_parse_lim(args.delta_xlim),
+        ylim_w=_parse_lim(args.delta_ylim),
     )
     print("wrote:")
     print(f"  {energy_plot}")

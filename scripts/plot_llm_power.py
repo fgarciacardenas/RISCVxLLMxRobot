@@ -277,7 +277,7 @@ def plot_power_with_markers(
     align_desc = f", align_shift_s={shift_s:.3f}" if align_to_events else ""
     ax0.set_title(f"Power ({rail}) with LLM decode windows (n={len(intervals)}), baseline={baseline_desc}{align_desc}")
     ax1.set_title("Delta power vs baseline (decode windows shaded)")
-    ax1.set_xlabel("Time since start (s)")
+    ax1.set_xlabel("Time (s)")
     ax0.set_ylabel("Power (W)")
     ax1.set_ylabel("Delta power (W)")
     ax0.grid(True, alpha=0.25)
@@ -303,6 +303,8 @@ def plot_delta_power_only_with_markers(
     rails: list[str],
     segments: list[SegmentEnergy],
     align_to_events: bool,
+    xlim_s: tuple[float, float] | None,
+    ylim_w: tuple[float, float] | None,
 ):
     intervals = read_llm_intervals(run_log)
     if not intervals:
@@ -351,10 +353,14 @@ def plot_delta_power_only_with_markers(
         ax.axvspan(xs, xe, color="#1f77b4", alpha=0.10)
 
     ax.axhline(0.0, color="#999999", linestyle="--", linewidth=1.0, alpha=0.7)
-    ax.set_xlabel("Time since start (s)")
+    ax.set_xlabel("Time (s)")
     ax.set_ylabel("Power (W)")
     ax.set_title(f"Jetson power plot. Baseline substracted: {baseline_desc}")
     ax.grid(True, alpha=0.25)
+    if xlim_s is not None:
+        ax.set_xlim(xlim_s[0], xlim_s[1])
+    if ylim_w is not None:
+        ax.set_ylim(ylim_w[0], ylim_w[1])
     ax.legend(loc="upper right", fontsize=9, ncol=1)
     fig.tight_layout()
     fig.savefig(outpath, dpi=160)
@@ -397,8 +403,20 @@ def main():
     ap.add_argument("--rails", default="VIN_SYS_5V0,VDD_GPU_SOC,VDD_CPU_CV", help="Rails to plot for energy-per-test.")
     ap.add_argument("--trace-rail", default="VDD_GPU_SOC", help="Single rail to plot for the full-run trace.")
     ap.add_argument("--delta-only-rails", default="VDD_CPU_CV,VDD_GPU_SOC,VIN_SYS_5V0", help="Rails to plot for the delta-only trace.")
+    ap.add_argument("--delta-xlim", default="", help="Optional x-axis limits for delta-only trace, e.g. '0,600'.")
+    ap.add_argument("--delta-ylim", default="", help="Optional y-axis limits for delta-only trace (W), e.g. '0,30'.")
     ap.add_argument("--outdir", default="plots", help="Output directory for images.")
     args = ap.parse_args()
+
+    def _parse_lim(spec: str) -> tuple[float, float] | None:
+        s = str(spec or "").strip()
+        if not s:
+            return None
+        for sep in (",", ":"):
+            if sep in s:
+                a, b = s.split(sep, 1)
+                return float(a.strip()), float(b.strip())
+        raise SystemExit(f"Invalid limit spec: '{spec}' (expected 'min,max')")
 
     logdir = args.logdir.strip()
     seg = args.segments_csv.strip()
@@ -478,6 +496,8 @@ def main():
         rails=delta_rails,
         segments=segments,
         align_to_events=not args.no_align,
+        xlim_s=_parse_lim(args.delta_xlim),
+        ylim_w=_parse_lim(args.delta_ylim),
     )
 
     print_segment_baselines(segments, rails=rails)
