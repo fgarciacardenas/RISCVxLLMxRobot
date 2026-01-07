@@ -176,6 +176,62 @@
   \end{columns}
 \end{frame}
 
+\begin{frame}{Prompt augmentation (RAG)}
+  \small
+  \begin{itemize}
+    \item \textbf{Objective:} inject short \textbf{domain hints} (thresholds, heuristics, safe ranges) into the prompt \textbf{without increasing model size}.
+    \item \textbf{Hint corpus:} compact ``memory'' text files, split into small chunks.
+    \item \textbf{Retrieval:} embed the \textbf{intent string} $h$, retrieve top-$k$ similar chunks (cosine similarity), and append them verbatim in a \texttt{<hints>} block.
+    \item \textbf{Tradeoff:} hints add prompt tokens (latency/energy); mitigated by \textbf{binary output + early stopping}.
+  \end{itemize}
+
+  \vspace{0.3em}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.5\textwidth}
+      \begin{block}{Cloud embeddings (reference)}
+        \begin{itemize}
+          \item Uses OpenAI embeddings API to build/query the same hint index.
+          \item Cloud is \emph{only} used for embeddings (not for generating hints).
+          \item Not suitable for autonomous deployment: connectivity + latency variability + data leaving the device.
+        \end{itemize}
+      \end{block}
+    \column{0.5\textwidth}
+      \begin{block}{On-board embeddings (deployable)}
+        \begin{itemize}
+          \item Uses \texttt{bge-small-en-v1.5} to embed hints fully on-device.
+          \item Index can be FAISS-backed or a lightweight NumPy similarity search.
+          \item Self-contained retrieval: robust to no-network scenarios.
+        \end{itemize}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Binary decision head (method)}
+  \small
+  \begin{itemize}
+    \item \textbf{Idea:} turn the LLM into a \textbf{verifiable classifier} by enforcing a strict output schema.
+    \item \textbf{Binary mode schema:} output \emph{only} one line:
+      \begin{center}
+        \texttt{Adhering to Human: True} \quad or \quad \texttt{Adhering to Human: False}
+      \end{center}
+    \item \textbf{Explanatory mode:} optional free-form reasoning \emph{after} the decision line (useful for debugging, expensive for deployment).
+    \item \textbf{Parsing:} a regex extracts the boolean; if missing/malformed $\Rightarrow$ \textbf{structure not followed} and counted as incorrect in \textbf{average accuracy}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Early stopping (decoding-time)}
+  \small
+  \begin{itemize}
+    \item \textbf{Goal:} save compute by stopping \emph{during decoding} as soon as the decision is produced (not post-hoc truncation).
+    \item \textbf{Stop criterion:} terminate generation once the output buffer contains either stop string:
+      \begin{center}
+        \texttt{Adhering to Human: True} \quad or \quad \texttt{Adhering to Human: False}
+      \end{center}
+    \item \textbf{Safety cap:} keep a small \texttt{max\_new\_tokens} (e.g., 7) so non-compliant outputs cannot run long.
+    \item \textbf{Backend-agnostic:} implemented via stop-strings/\texttt{StoppingCriteria} on GPU and \texttt{llama.cpp}, and applied consistently before parsing/metrics.
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Pipeline overview (backend-agnostic)}
   \centering
   \begin{tikzpicture}[node distance=9mm, every node/.style={font=\small}, rounded corners]
@@ -194,6 +250,39 @@
     \draw[->, thick] (backend) -- (parse);
     \draw[->, thick] (binary) -| (backend.west);
   \end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Inference backend}
+  \small
+  \textbf{Common interface:} \texttt{prompt} $\rightarrow$ \texttt{completion text} $\rightarrow$ \texttt{parsed decision} (shared parser + metrics).
+
+  \vspace{0.6em}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.33\textwidth}
+      \begin{block}{GPU (Transformers, FP16)}
+        \begin{itemize}
+          \item Baseline execution (RTX/Jetson).
+          \item Stable reference for RAG and early-stopping ablations.
+          \item Highest throughput; not the most memory-efficient.
+        \end{itemize}
+      \end{block}
+    \column{0.33\textwidth}
+      \begin{block}{GGUF (\texttt{llama.cpp})}
+        \begin{itemize}
+          \item Quantized checkpoints (Q4.M/Q5.M/Q8.0).
+          \item Smaller footprint; CPU-friendly runtimes.
+          \item Supports streaming and the same early-stopping criterion.
+        \end{itemize}
+      \end{block}
+    \column{0.33\textwidth}
+      \begin{block}{Axelera Metis (INT8)}
+        \begin{itemize}
+          \item Vendor compilation/runtime (often INT8) on a RISC-V host.
+          \item Target: low-power embedded inference.
+          \item Main risk: accuracy sensitivity to compiler/quantization calibration.
+        \end{itemize}
+      \end{block}
+  \end{columns}
 \end{frame}
 
 \begin{frame}{Metrics}
@@ -216,7 +305,7 @@
     \toprule
     \multicolumn{5}{c}{\cellcolor{gpuColor} \textbf{GPU FP16 baselines (RAG comparison)}} \\
     \midrule
-    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Out tok}\\\textbf{(avg.)}} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Structure}\\\textbf{followed (\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
     \midrule
     Phi3 & \xmark & 99.18\% & 71.83 | 72.39\% & 114 \\
     Phi3 & OpenAI & 100.00\% & \textbf{79.31 | 79.31\%} & 150 \\
@@ -224,7 +313,7 @@
     \midrule
     Llama3.2 & \xmark & 98.22\% & 70.75 | 72.10\% & 120 \\
     Llama3.2 & OpenAI & 97.21\% & 66.24 | 68.52\% & 124 \\
-    Llama3.2 & BGE & \cellcolor{ragColor}86.42\% & 69.54 | \textbf{80.58\%} & \cellcolor{outputColor}227 \\
+    Llama3.2 & BGE & 86.42\% & 69.54 | \textbf{80.58\%} & 227 \\
     \midrule
     Qwen2.5 (7B) & \xmark & 100.00\% & 81.35 | 81.35\% & 109 \\
     Qwen2.5 (7B) & OpenAI & 100.00\% & 84.33 | 84.33\% & 129 \\
@@ -247,10 +336,10 @@
     \midrule
     \textbf{Metric (mean)} & \textbf{No RAG} & \textbf{OpenAI RAG} & \textbf{BGE RAG} \\
     \midrule
-    \rowcolor{promptColor} Prompt tokens & 607.3 & 762.8 & 751.3 \\
-    \rowcolor{ragColor} RAG hint tokens & 0.0 & 156.5 & 145.0 \\
-    \rowcolor{outputColor} Output tokens & 115.1 & 150.9 & 158.7 \\
-    \rowcolor{averageColor} \textbf{Context tokens} & \textbf{722.4} & \textbf{913.7} & \textbf{910.0} \\
+    Prompt tokens & 607.3 & 762.8 & 751.3 \\
+    RAG hint tokens & 0.0 & 156.5 & 145.0 \\
+    Output tokens & 115.1 & 150.9 & 158.7 \\
+    \textbf{Context tokens} & \textbf{722.4} & \textbf{913.7} & \textbf{910.0} \\
     \bottomrule
   \end{tabular}
 
@@ -289,6 +378,7 @@
 \end{frame}
 
 \begin{frame}{Binary decision head + early stopping (GPU)}
+  \centering
   \scriptsize
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.15}
@@ -296,76 +386,115 @@
     \toprule
     \multicolumn{7}{c}{\cellcolor{gpuColor} \textbf{Binary decision head with early stopping (GPU)}} \\
     \midrule
-    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Structure}\\\textbf{followed (\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
     \midrule
-    Phi3 & 3.80 B & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
-    Phi3 & 3.80 B & \xmark & \cmark & 100.00\% & \hphantom{}70.88 | 70.88\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Phi3 & 3.80 B & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & 114 \\
+    Phi3 & 3.80 B & \xmark & \cmark & 100.00\% & \hphantom{}70.88 | 70.88\hphantom{}\% & 7 \\
     \addlinespace
-    Qwen2.5 & 7.61 B & \xmark & \xmark & 100.00\% & \hphantom{}81.35 | 81.35\hphantom{}\% & \hphantom{}109 | 109\hphantom{} \\
-    Qwen2.5 & 7.61 B & \xmark & \cmark & 100.00\% & \hphantom{}81.47 | 81.47\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Qwen2.5 & 7.61 B & \xmark & \xmark & 100.00\% & \hphantom{}81.35 | 81.35\hphantom{}\% & 109 \\
+    Qwen2.5 & 7.61 B & \xmark & \cmark & 100.00\% & \hphantom{}81.47 | 81.47\hphantom{}\% & 7 \\
     \bottomrule
   \end{tabular}
-\vspace{0.7em}
-\footnotesize{Takeaway: binary outputs reduce generation from $\sim$100+ tokens to 7 with minimal accuracy change (when structure is followed).}
+  \par\vspace{0.7em}
+  \footnotesize{Takeaway: binary outputs reduce generation from $\sim$100+ tokens to 7 with minimal accuracy change (when structure is followed).}
 \end{frame}
 
-\begin{frame}{Binary head: what it enables}
+\begin{frame}{Power profiling: setup}
   \begin{itemize}
-    \item \textbf{Verifiable output:} single-line decision is easy to parse and score.
-    \item \textbf{Early stopping:} stop as soon as the decision is produced (avoid long explanations).
-    \item \textbf{Efficiency:} token reduction typically yields lower latency and energy per decision.
-    \item \textbf{Robustness lever:} if structure-followed drops, average accuracy collapses even if parsed accuracy is high.
+    \item \textbf{Goal:} quantify how output length translates to \textbf{energy per inference}.
+    \item \textbf{Workload:} identical prompt set; compare \textbf{explanatory} (\xmark) vs \textbf{binary} (\cmark) early-stopping mode.
+    \item \textbf{Jetson Orin:} sampled \texttt{tegrastats} rails (\texttt{VDD\_GPU\_SOC}, \texttt{VIN\_SYS\_5V0}, \texttt{VDD\_CPU\_CV}); subtract per-rail idle baseline; integrate over inference windows.
+    \item \textbf{RTX 4070:} sampled device power via \texttt{nvidia-smi}; subtract idle baseline; integrate over inference windows.
   \end{itemize}
 \end{frame}
 
-\begin{frame}{GGUF quantization (Q4.M vs Q5.M, \texttt{llama.cpp})}
+\begin{frame}{Power profiling: key results}
+  \centering
   \scriptsize
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{lcccccc}
+  \begin{tabular}{lccccc}
     \toprule
-    \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{GGUF quantization (Q4.M/Q5.M) vs GPU FP16}} \\
+    \multicolumn{6}{c}{\cellcolor{averageColor} \textbf{Baseline-subtracted power/energy per inference (median)}} \\
     \midrule
-    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{Model}\\\textbf{Params}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Device}\\\textbf{used}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \textbf{Platform} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Output}\\\textbf{tokens}} & \makecell{\textbf{Inference}\\\textbf{time (s)}} & \makecell{\textbf{Power}\\\textbf{(W)}} & \makecell{\textbf{Energy}\\\textbf{(J)}} \\
     \midrule
-    Phi3 & 3.80 B & BGE & GPU (FP16) & 100.00\% & \hphantom{}77.86 | 77.86\hphantom{}\% & \hphantom{}160 | 160\hphantom{} \\
-    Phi3 & 3.80 B & BGE & GGUF (Q4.M) & 99.81\% & \hphantom{}71.95 | 72.06\hphantom{}\% & \hphantom{0}63 | 63\hphantom{0} \\
-    Phi3 & 3.80 B & BGE & GGUF (Q5.M) & 100.00\% & \hphantom{}81.73 | 81.73\hphantom{}\% & \hphantom{}174 | 174\hphantom{} \\
-    \addlinespace
-    Llama3.2 & 3.21 B & \xmark & GPU (FP16) & 98.22\% & \hphantom{}70.75 | 72.10\hphantom{}\% & \hphantom{}120 | 113\hphantom{} \\
-    Llama3.2 & 3.21 B & \xmark & GGUF (Q4.M) & 99.49\% & \hphantom{}66.43 | 66.78\hphantom{}\% & \hphantom{}185 | 184\hphantom{} \\
-    Llama3.2 & 3.21 B & \xmark & GGUF (Q5.M) & 99.11\% & \hphantom{}66.94 | 67.61\hphantom{}\% & \hphantom{}104 | 101\hphantom{} \\
+    Jetson Orin & \xmark & 512.0 & 14.79 & 29.73 & 531.3 \\
+    Jetson Orin & \cmark & 7.0 & 0.63 & 25.64 & \textbf{19.3} \\
+    \midrule
+    RTX 4070 & \xmark & 109.5 & 0.75 & 182.88 & 137.2 \\
+    RTX 4070 & \cmark & 7.0 & 0.10 & 230.94 & \textbf{19.4} \\
     \bottomrule
   \end{tabular}
-\vspace{0.7em}
-\footnotesize{Takeaway: Q4.M preserves structure but can shift accuracy and output length depending on backbone and prompts.}
+
+  \par\vspace{0.7em}
+  \footnotesize
+  Takeaway: binary early stopping cuts energy per inference from $\sim$531\,J$\rightarrow$19\,J on Jetson and $\sim$137\,J$\rightarrow$19\,J on RTX; savings are dominated by shorter inference time.
+\end{frame}
+
+\begin{frame}{GGUF quantization (BGE + binary, \texttt{llama.cpp})}
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.1}
+  \begin{tabular}{lcccccc}
+    \toprule
+    \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{GGUF quantization (BGE + binary) vs GPU baseline}} \\
+    \midrule
+    \makecell{\textbf{Model}\\\textbf{name}} &
+    \makecell{\textbf{Model}\\\textbf{params}} &
+    \makecell{\textbf{Quant}\\\textbf{method}} &
+    \makecell{\textbf{Model}\\\textbf{size (MB)}} &
+    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
+    \makecell{\textbf{Accuracy}\\\textbf{(avg.)}} &
+    \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
+    \midrule
+    Phi3 & 3.80 B & FP16 & \textit{TBD} & 95.81\% & 75.51\% & 7 \\
+    Phi3 & 3.80 B & Q4.M & \textit{TBD} & 98.10\% & 54.63\% & 7 \\
+    Phi3 & 3.80 B & Q5.M & \textit{TBD} & 91.50\% & 76.65\% & 7 \\
+    \addlinespace
+    Llama3.2 & 3.21 B & FP16 & \textit{TBD} & 100.00\% & 66.75\% & 7 \\
+    Llama3.2 & 3.21 B & Q4.M & \textit{TBD} & 100.00\% & 56.41\% & 7 \\
+    Llama3.2 & 3.21 B & Q5.M & \textit{TBD} & 100.00\% & 63.71\% & 7 \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{0.7em}
+  \footnotesize{Takeaway: with \textbf{BGE + binary} the output length is fixed (7 tokens), but quantization can still shift \textbf{decision quality} depending on model and quant level.}
 \end{frame}
 
 \begin{frame}{GGUF vs GPU: how to interpret}
   \begin{itemize}
-    \item \textbf{Strength:} strong compression and fast local runtimes with high structure-followed rates.
-    \item \textbf{Tradeoff:} accuracy and verbosity can shift depending on backbone and prompt template.
-    \item \textbf{Recommendation:} benchmark the exact prompt + output mode (binary vs explanatory) you plan to deploy.
+    \item \textbf{Strength:} strong compression and fast local runtimes (CPU-friendly) while keeping outputs mostly parseable.
+    \item \textbf{Tradeoff:} even in \textbf{binary mode} (fixed 7-token output), \textbf{accuracy can shift} across quant levels and backbones.
+    \item \textbf{Recommendation:} benchmark the exact retrieval + output mode (\textbf{BGE + binary}) on the target quant scheme (Q4.M/Q5.M/\dots).
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Axelera Metis (INT8): structure vs decision quality}
   \scriptsize
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{lcccccc}
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.1}
+  \begin{tabular}{lcccccccc}
     \toprule
-    \multicolumn{7}{c}{\cellcolor{axeleraColor} \textbf{Axelera Metis INT8 vs GPU baseline}} \\
+    \multicolumn{9}{c}{\cellcolor{axeleraColor} \textbf{Axelera Metis INT8 vs GPU baseline}} \\
     \midrule
-    \makecell{\textbf{Model}} & \makecell{\textbf{Device}} & \makecell{\textbf{RAG}\\\textbf{type}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \makecell{\textbf{Model}} &
+    \makecell{\textbf{Model}\\\textbf{params}} &
+    \makecell{\textbf{Device}} &
+    \makecell{\textbf{Quant}\\\textbf{method}} &
+    \makecell{\textbf{RAG}\\\textbf{type}} &
+    \makecell{\textbf{Binary}\\\textbf{output}} &
+    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
+    \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} &
+    \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
     \midrule
-    Phi3 (3.8B) & GPU (FP16) & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & \hphantom{}114 | 111\hphantom{} \\
-    Phi3 (3.8B) & Axelera (INT8) & \xmark & \xmark & 97.02\% & \hphantom{}55.84 | 57.54\hphantom{}\% & \hphantom{}223 | 221\hphantom{} \\
-    Phi3 (3.8B) & Axelera (INT8) & \xmark & \cmark & 98.41\% & \hphantom{}66.12 | 67.09\hphantom{}\% & \hphantom{00}9 | 7\hphantom{00} \\
+    Phi3 & 3.80 B & GPU & FP16 & \xmark & \xmark & 99.18\% & \hphantom{}71.83 | 72.39\hphantom{}\% & 114 \\
+    Phi3 & 3.80 B & Axelera & INT8 & \xmark & \xmark & 97.02\% & \hphantom{}55.84 | 57.54\hphantom{}\% & 223 \\
+    Phi3 & 3.80 B & Axelera & INT8 & \xmark & \cmark & 98.41\% & \hphantom{}66.12 | 67.09\hphantom{}\% & 9 \\
     \addlinespace
-    Llama3.2 (3.2B) & GPU (FP16) & BGE & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & \hphantom{}227 | 184\hphantom{} \\
-    Llama3.2 (3.2B) & Axelera (INT8) & BGE & \xmark & 49.62\% & \hphantom{}34.33 | 67.62\hphantom{}\% & \hphantom{}188 | 179\hphantom{} \\
-    Llama3.2 (3.2B) & Axelera (INT8) & BGE & \cmark & 100.00\% & \hphantom{}52.98 | 52.98\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Llama3.2 & 3.21 B & GPU & FP16 & BGE & \xmark & 86.42\% & \hphantom{}69.54 | 80.58\hphantom{}\% & 227 \\
+    Llama3.2 & 3.21 B & Axelera & INT8 & BGE & \xmark & 49.62\% & \hphantom{}34.33 | 67.62\hphantom{}\% & 188 \\
+    Llama3.2 & 3.21 B & Axelera & INT8 & BGE & \cmark & 100.00\% & \hphantom{}52.98 | 52.98\hphantom{}\% & 7 \\
     \bottomrule
   \end{tabular}
 \vspace{0.7em}
@@ -381,23 +510,29 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{SFT improves structure and reduces verbosity (Qwen2.5)}
+\begin{frame}{SFT+GRPO improves structure and reduces verbosity (Qwen2.5)}
   \scriptsize
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{lccccc}
+  \begin{tabular}{lcccccc}
     \toprule
-    \multicolumn{6}{c}{\cellcolor{gpuColor} \textbf{Effect of SFT on Qwen2.5 (GPU FP16, no-RAG)}} \\
+    \multicolumn{7}{c}{\cellcolor{gpuColor} \textbf{SFT+GRPO (Qwen2.5, GPU FP16, no-RAG)}} \\
     \midrule
-    \makecell{\textbf{Model}\\\textbf{name}} & \makecell{\textbf{SFT}\\\textbf{}} & \makecell{\textbf{Binary}\\\textbf{output}} & \makecell{\textbf{Struct}\\\textbf{(\%)}} & \makecell{\textbf{Accuracy}\\\textbf{(avg. | par.)}} & \makecell{\textbf{Tokens}\\\textbf{(avg. | par.)}} \\
+    \makecell{\textbf{Model}\\\textbf{name}} &
+    \makecell{\textbf{Model}\\\textbf{params}} &
+    \makecell{\textbf{SFT+}\\\textbf{GRPO}} &
+    \makecell{\textbf{Binary}\\\textbf{output}} &
+    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
+    \makecell{\textbf{Accuracy}\\\textbf{(avg.)}} &
+    \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
     \midrule
-    Qwen2.5 (7.61B) & \xmark & \xmark & 100.00\% & \hphantom{}81.35 | 81.35\hphantom{}\% & \hphantom{}109 | 109\hphantom{} \\
-    Qwen2.5 (7.61B) & \cmark & \xmark & 100.00\% & \hphantom{}85.28 | 85.28\hphantom{}\% & \hphantom{0}71 | 71\hphantom{0} \\
-    Qwen2.5 (7.61B) & \cmark & \cmark & 100.00\% & \hphantom{}85.72 | 85.72\hphantom{}\% & \hphantom{00}7 | 7\hphantom{00} \\
+    Qwen2.5 & 7.61 B & \xmark & \xmark & 100.00\% & 81.35\% & 109 \\
+    Qwen2.5 & 7.61 B & \cmark & \xmark & 100.00\% & 85.28\% & 71 \\
+    Qwen2.5 & 7.61 B & \cmark & \cmark & 100.00\% & \textbf{85.72\%} & 7 \\
     \bottomrule
   \end{tabular}
 \vspace{0.7em}
-\footnotesize{Takeaway: SFT maintains strong accuracy while improving verbosity/formatting; in binary mode it reliably emits a short decision.}
+\footnotesize{Takeaway: SFT+GRPO maintains strong accuracy while improving formatting; in binary mode it reliably emits a short decision.}
 \end{frame}
 
 \begin{frame}{Conclusion: problem context}
