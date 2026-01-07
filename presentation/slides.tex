@@ -442,22 +442,22 @@
     \multicolumn{7}{c}{\cellcolor{ggufColor} \textbf{GGUF quantization (BGE + binary) vs GPU baseline}} \\
     \midrule
     \makecell{\textbf{Model}\\\textbf{name}} &
-    \makecell{\textbf{Model}\\\textbf{params}} &
-    \makecell{\textbf{Quant}\\\textbf{method}} &
-    \makecell{\textbf{Model}\\\textbf{size (MB)}} &
-    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
-    \makecell{\textbf{Accuracy}\\\textbf{(avg.)}} &
-    \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
-    \midrule
-    Phi3 & 3.80 B & FP16 & \textit{TBD} & 95.81\% & 75.51\% & 7 \\
-    Phi3 & 3.80 B & Q4.M & \textit{TBD} & 98.10\% & 54.63\% & 7 \\
-    Phi3 & 3.80 B & Q5.M & \textit{TBD} & 91.50\% & 76.65\% & 7 \\
-    \addlinespace
-    Llama3.2 & 3.21 B & FP16 & \textit{TBD} & 100.00\% & 66.75\% & 7 \\
-    Llama3.2 & 3.21 B & Q4.M & \textit{TBD} & 100.00\% & 56.41\% & 7 \\
-    Llama3.2 & 3.21 B & Q5.M & \textit{TBD} & 100.00\% & 63.71\% & 7 \\
-    \bottomrule
-  \end{tabular}
+	    \makecell{\textbf{Model}\\\textbf{params}} &
+	    \makecell{\textbf{Quant}\\\textbf{method}} &
+	    \makecell{\textbf{Model}\\\textbf{size (GB)}} &
+	    \makecell{\textbf{Structure}\\\textbf{followed (\%)}} &
+	    \makecell{\textbf{Accuracy}\\\textbf{(avg.)}} &
+	    \makecell{\textbf{Output tokens}\\\textbf{(avg.)}} \\
+	    \midrule
+	    Phi3 & 3.80 B & FP16 & 7.64 & 95.81\% & 75.51\% & 7 \\
+	    Phi3 & 3.80 B & Q4.M & 2.39 & 98.10\% & 54.63\% & 7 \\
+	    Phi3 & 3.80 B & Q5.M & 2.72 & 91.50\% & 76.65\% & 7 \\
+	    \addlinespace
+	    Llama3.2 & 3.21 B & FP16 & 6.42 & 100.00\% & 66.75\% & 7 \\
+	    Llama3.2 & 3.21 B & Q4.M & 2.02 & 100.00\% & 56.41\% & 7 \\
+	    Llama3.2 & 3.21 B & Q5.M & 2.32 & 100.00\% & 63.71\% & 7 \\
+	    \bottomrule
+	  \end{tabular}
   \par\vspace{0.7em}
   \footnotesize{Takeaway: with \textbf{BGE + binary} the output length is fixed (7 tokens), but quantization can still shift \textbf{decision quality} depending on model and quant level.}
 \end{frame}
@@ -511,6 +511,12 @@
 \end{frame}
 
 \begin{frame}{SFT+GRPO improves structure and reduces verbosity (Qwen2.5)}
+  \small
+  \begin{itemize}
+    \item \textbf{SFT:} supervised fine-tuning on curated instruction/format examples to improve task performance and schema compliance.
+    \item \textbf{GRPO:} RL post-training that optimizes a \textbf{verifiable reward} (e.g., parseable output + correctness), further improving robustness and reducing verbosity.
+  \end{itemize}
+  \vspace{0.2em}
   \scriptsize
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.15}
